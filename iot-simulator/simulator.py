@@ -17,6 +17,10 @@ Environment variables:
   MQTT_HOST  - MQTT broker host (default: localhost)
   MQTT_PORT  - MQTT broker port (default: 1883)
   MQTT_USERNAME / MQTT_PASSWORD - broker credentials (optional; anonymous when unset)
+  HARDWARE_DEVICE_IDS - comma-separated device ids served by real hardware
+                        (e.g. the ESP32 edge node in hardware/). The simulator
+                        ignores them so it never publishes fake telemetry or
+                        answers commands for a physical device. Default: none.
 """
 
 import os
@@ -32,6 +36,19 @@ MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+
+
+def parse_hardware_ids(raw: str | None) -> frozenset[int]:
+    """Parse HARDWARE_DEVICE_IDS ("7, 8") into a set of ints; ignores blanks and junk."""
+    ids = set()
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.add(int(part))
+    return frozenset(ids)
+
+
+HARDWARE_DEVICE_IDS = parse_hardware_ids(os.getenv("HARDWARE_DEVICE_IDS"))
 
 LOCATIONS = ["Sector-A", "Sector-B", "Sector-C", "Sector-D", "Sector-E"]
 STATUS_WEIGHTS = ["online"] * 3 + ["idle"]  # 75% online, 25% idle
@@ -154,6 +171,9 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 
 def _handle_registry(client, device_id: int, raw: bytes):
+    if device_id in HARDWARE_DEVICE_IDS:
+        print(f"[REGISTRY] device {device_id} served by real hardware; simulator skips it")
+        return
     if not raw:  # tombstone -> remove device
         with _lock:
             _devices.pop(device_id, None)

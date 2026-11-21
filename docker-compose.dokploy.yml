@@ -172,6 +172,8 @@ services:
     environment:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      # IDs de dispositivos atendidos por el ESP32 real (hardware/); el simulador los ignora
+      - HARDWARE_DEVICE_IDS=${HARDWARE_DEVICE_IDS:-}
       - MQTT_USERNAME=${MQTT_USERNAME:-iobuild}
       - MQTT_PASSWORD=${MQTT_PASSWORD:?Set MQTT_PASSWORD in Dokploy}
     depends_on:

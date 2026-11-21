@@ -178,6 +178,8 @@ services:
     environment:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
+      # IDs de dispositivos atendidos por el ESP32 real (hardware/); el simulador los ignora
+      - HARDWARE_DEVICE_IDS=${HARDWARE_DEVICE_IDS:-}
     depends_on:
       - mosquitto
     networks:
