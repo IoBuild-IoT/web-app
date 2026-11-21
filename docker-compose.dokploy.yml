@@ -8,7 +8,9 @@
 # Keep the same Dokploy project name to reuse the existing MySQL volume.
 # Set INFLUXDB_ADMIN_PASSWORD and INFLUXDB_ADMIN_TOKEN in Dokploy before deploy.
 # Set MQTT_PASSWORD (and optionally MQTT_USERNAME, default iobuild) in Dokploy: the broker
-# rejects anonymous clients and the API and simulator connect with these credentials.
+# rejects anonymous clients and the API, simulator and iot-monitor connect with these credentials.
+# Optional demo Domain: iot-monitor:8090 (live MQTT view). It has no login of its own, so
+# protect that Domain in Dokploy (basic auth) or leave it without a Domain.
 
 services:
   iobuild-api:
@@ -180,6 +182,27 @@ services:
       - mosquitto
     networks:
       - iobuild-network
+
+  # Read-only live view of registry/commands/telemetry (demo). Publish only through a
+  # protected Dokploy Domain; do not add a host `ports` mapping, Traefik routes to 8090.
+  iot-monitor:
+    build:
+      context: ./iot-monitor
+      dockerfile: Dockerfile
+    container_name: iobuild-iot-monitor
+    restart: unless-stopped
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - HARDWARE_DEVICE_IDS=${HARDWARE_DEVICE_IDS:-}
+      - MQTT_USERNAME=${MQTT_USERNAME:-iobuild}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:?Set MQTT_PASSWORD in Dokploy}
+    depends_on:
+      - mosquitto
+    networks:
+      - iobuild-network
+    expose:
+      - "8090"
 
 networks:
   iobuild-network:
