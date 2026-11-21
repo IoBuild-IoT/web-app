@@ -26,7 +26,7 @@ public sealed class MqttDeviceTransport(Microsoft.Extensions.Configuration.IConf
                 {
                     var topic = arguments.ApplicationMessage.Topic ?? string.Empty;
                     if (!topic.StartsWith("telemetry/", StringComparison.Ordinal) || !int.TryParse(topic["telemetry/".Length..], out var id)) return;
-                    try { var seq = arguments.ApplicationMessage.Payload; var payloadBytes = new byte[seq.Length]; seq.CopyTo(payloadBytes); var payloadString = System.Text.Encoding.UTF8.GetString(payloadBytes); var json = System.Text.Json.JsonDocument.Parse(payloadString); var root = json.RootElement; var eventId = root.TryGetProperty("eventId", out var eventValue) ? eventValue.GetString() ?? $"{id}:{root.GetProperty("timestamp").GetString()}" : $"{id}:{root.GetProperty("timestamp").GetString()}"; var timestamp = root.TryGetProperty("timestamp", out var ts) ? DateTimeOffset.Parse(ts.GetString()!) : DateTimeOffset.UtcNow; var status = root.TryGetProperty("status", out var state) ? state.GetString() ?? "unknown" : "unknown"; var reported = root.TryGetProperty("reported", out var reportedValue) ? reportedValue.GetRawText() : "{}"; var energy = root.TryGetProperty("energy_kwh", out var energyValue) ? energyValue.GetDouble() : 0; var temperature = root.TryGetProperty("temperature_c", out var temperatureValue) ? temperatureValue.GetDouble() : 0; var voltage = root.TryGetProperty("voltage_v", out var voltageValue) ? voltageValue.GetDouble() : 0; using var scope = scopes.CreateScope(); await scope.ServiceProvider.GetRequiredService<DeviceTelemetryService>().IngestAsync(new TelemetryMessage(id, eventId, timestamp, status, reported, energy, temperature, voltage)); } catch (Exception) { }
+                    try { var seq = arguments.ApplicationMessage.Payload; var payloadBytes = new byte[seq.Length]; seq.CopyTo(payloadBytes); var payloadString = System.Text.Encoding.UTF8.GetString(payloadBytes); var json = System.Text.Json.JsonDocument.Parse(payloadString); var root = json.RootElement; var eventId = root.TryGetProperty("eventId", out var eventValue) ? eventValue.GetString() ?? $"{id}:{root.GetProperty("timestamp").GetString()}" : $"{id}:{root.GetProperty("timestamp").GetString()}"; var timestamp = root.TryGetProperty("timestamp", out var ts) ? DateTimeOffset.Parse(ts.GetString()!) : DateTimeOffset.UtcNow; var status = root.TryGetProperty("status", out var state) ? state.GetString() ?? "unknown" : "unknown"; var reported = root.TryGetProperty("reported", out var reportedValue) ? reportedValue.GetRawText() : "{}"; var energy = root.TryGetProperty("energy_kwh", out var energyValue) ? energyValue.GetDouble() : 0; var temperature = root.TryGetProperty("temperature_c", out var temperatureValue) ? temperatureValue.GetDouble() : 0; var voltage = root.TryGetProperty("voltage_v", out var voltageValue) ? voltageValue.GetDouble() : 0; var node = ParseNode(root); using var scope = scopes.CreateScope(); await scope.ServiceProvider.GetRequiredService<DeviceTelemetryService>().IngestAsync(new TelemetryMessage(id, eventId, timestamp, status, reported, energy, temperature, voltage, node)); } catch (Exception) { }
                 };
                 messageHandlerConfigured = true;
             }
@@ -71,6 +71,15 @@ public sealed class MqttDeviceTransport(Microsoft.Extensions.Configuration.IConf
             }
         }
         finally { connectionGate.Release(); }
+    }
+    public static NodeSample? ParseNode(System.Text.Json.JsonElement root)
+    {
+        if (!root.TryGetProperty("node", out var node) || node.ValueKind != System.Text.Json.JsonValueKind.Object) return null;
+        double? humidity = node.TryGetProperty("humidity", out var h) && h.ValueKind == System.Text.Json.JsonValueKind.Number ? h.GetDouble() : null;
+        bool? presence = node.TryGetProperty("presence", out var p) && p.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False ? p.GetBoolean() : null;
+        int? blind = node.TryGetProperty("blind_deg", out var b) && b.ValueKind == System.Text.Json.JsonValueKind.Number ? b.GetInt32() : null;
+        bool? alarm = node.TryGetProperty("alarm", out var a) && a.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False ? a.GetBoolean() : null;
+        return new NodeSample(humidity, presence, blind, alarm);
     }
     private MQTTnet.MqttClientOptions ConnectionOptions(string host, int port)
     {

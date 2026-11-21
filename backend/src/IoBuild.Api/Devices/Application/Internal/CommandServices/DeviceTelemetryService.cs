@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IoBuild.Api.Devices.Application.Internal.CommandServices;
 
-public sealed record TelemetryMessage(int DeviceId, string EventId, DateTimeOffset OccurredAt, string Status, string ReportedJson, double EnergyKwh, double TemperatureC = 0, double VoltageV = 0);
+public sealed record NodeSample(double? HumidityPct = null, bool? Presence = null, int? BlindDeg = null, bool? Alarm = null);
+public sealed record TelemetryMessage(int DeviceId, string EventId, DateTimeOffset OccurredAt, string Status, string ReportedJson, double EnergyKwh, double TemperatureC = 0, double VoltageV = 0, NodeSample? Node = null);
 public interface IInfluxTelemetrySink { Task WriteAsync(TelemetryMessage message, CancellationToken cancellationToken = default); }
 public interface IDeviceMqttPublisher { Task PublishAsync(string topic, string payload, bool qos1, bool retain, CancellationToken cancellationToken = default); }
 
@@ -77,16 +78,17 @@ public sealed class DeviceTelemetryService(IoBuildDbContext db, IInfluxTelemetry
         if (command is not null) command.AcknowledgedAt = message.OccurredAt;
         db.TelemetryRecoveries.Add(new TelemetryRecovery { EventId = message.EventId, CreatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(cancellationToken);
-        try { await ReplayExistingAsync(record, cancellationToken); }
+        try { await ReplayExistingAsync(record, cancellationToken, message.Node); }
         catch (Exception) { }
         return true;
     }
 
-    private async Task ReplayExistingAsync(DeviceTelemetry record, CancellationToken cancellationToken)
+    // node samples (humidity, presence, ...) live only in Influx; a replay from MySQL carries just the core fields.
+    private async Task ReplayExistingAsync(DeviceTelemetry record, CancellationToken cancellationToken, NodeSample? node = null)
     {
         try
         {
-            await influx.WriteAsync(new TelemetryMessage(record.DeviceId, record.EventId, record.OccurredAt, record.Status, record.ReportedJson, record.EnergyKwh, record.TemperatureC, record.VoltageV), cancellationToken);
+            await influx.WriteAsync(new TelemetryMessage(record.DeviceId, record.EventId, record.OccurredAt, record.Status, record.ReportedJson, record.EnergyKwh, record.TemperatureC, record.VoltageV, node), cancellationToken);
             record.InfluxWrittenAt = DateTimeOffset.UtcNow;
             var intent = await db.TelemetryRecoveries.SingleOrDefaultAsync(item => item.EventId == record.EventId, cancellationToken);
             if (intent is not null) db.TelemetryRecoveries.Remove(intent);
