@@ -185,6 +185,24 @@ services:
     networks:
       - iobuild-network
 
+  # IoT monitor — read-only live view of registry/commands/telemetry (demo, http://localhost:8090)
+  iot-monitor:
+    build:
+      context: ./iot-monitor
+      dockerfile: Dockerfile
+    container_name: iobuild-iot-monitor
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - HARDWARE_DEVICE_IDS=${HARDWARE_DEVICE_IDS:-}
+    depends_on:
+      - mosquitto
+    networks:
+      - iobuild-network
+
 networks:
   iobuild-network:
     driver: bridge

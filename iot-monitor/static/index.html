@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IoBuild · Monitor IoT</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #fff; --text: #1b1f27; --muted: #667085; --line: #e3e6ec;
+    --hw: #0f766e; --sim: #6b7280; --cmd: #b45309; --ok: #15803d; --bad: #b91c1c; --reg: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1218; --panel: #181c25; --text: #e7eaf0; --muted: #9aa3b2; --line: #2a303c;
+      --hw: #2dd4bf; --sim: #9ca3af; --cmd: #fbbf24; --ok: #4ade80; --bad: #f87171; --reg: #60a5fa;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  h1 { font-size: 17px; margin: 0; flex: 1 1 auto; }
+  .pill { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .pill.on { color: var(--ok); border-color: var(--ok); }
+  .pill.off { color: var(--bad); border-color: var(--bad); }
+  main { padding: 16px; display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .card.hardware { border-left: 4px solid var(--hw); }
+  .card.simulator { border-left: 4px solid var(--sim); }
+  .card h3 { margin: 0 0 6px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+  .tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .tag.hardware { color: var(--hw); } .tag.simulator { color: var(--sim); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+  #timeline { max-height: 55vh; overflow: auto; font: 12.5px/1.5 ui-monospace, Consolas, monospace; }
+  .row { display: grid; grid-template-columns: 84px 92px 70px 1fr; gap: 8px; padding: 3px 4px; border-bottom: 1px solid var(--line); }
+  .row .t { color: var(--muted); }
+  .row .k { font-weight: 600; }
+  .k.device_registered, .k.device_removed { color: var(--reg); }
+  .k.command_sent { color: var(--cmd); }
+  .k.telemetry { color: var(--muted); }
+  .k.command_executed { color: var(--ok); }
+  .row.exec { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .row.cmd { background: color-mix(in srgb, var(--cmd) 10%, transparent); }
+  .empty { color: var(--muted); padding: 8px 0; }
+  @media (max-width: 600px) { .row { grid-template-columns: 70px 1fr; } .row .d { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>IoBuild · Monitor IoT en tiempo real</h1>
+  <span id="ws" class="pill off">página sin conexión</span>
+  <span id="mqtt" class="pill off">broker MQTT: sin conexión</span>
+</header>
+<main>
+  <section>
+    <h2>Dispositivos</h2>
+    <div id="cards"><div class="empty">Esperando datos de los dispositivos…</div></div>
+  </section>
+  <section class="panel">
+    <h2>Línea de tiempo</h2>
+    <div class="bar">
+      <label><input type="checkbox" id="hideTelemetry"> Ocultar telemetría periódica</label>
+      <label><input type="checkbox" id="onlyHardware"> Solo hardware real</label>
+      <span id="count"></span>
+    </div>
+    <div id="timeline"></div>
+  </section>
+</main>
+<script>
+const KIND_LABEL = {
+  device_registered: 'REGISTRO', device_removed: 'BAJA', command_sent: 'ORDEN app→hw',
+  telemetry: 'TELEMETRÍA', command_executed: 'EJECUTADA ✓',
+};
+const state = { devices: new Map(), events: [] };
+const $ = id => document.getElementById(id);
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+const hhmmss = iso => new Date(iso).toLocaleTimeString('es', { hour12: false });
+const compact = obj => JSON.stringify(obj);
+
+function describe(e) {
+  switch (e.kind) {
+    case 'device_registered': return `dispositivo ${e.deviceId} registrado (${e.type ?? 'tipo desconocido'})`;
+    case 'device_removed': return `dispositivo ${e.deviceId} dado de baja`;
+    case 'command_sent': return `orden para #${e.deviceId}: ${compact(e.desired)}${e.replayed ? ' (retenida, reenviada al conectar)' : ''}`;
+    case 'command_executed': return `#${e.deviceId} ejecutó la orden en ${e.latency_ms} ms → reportó ${compact(e.reported)}`;
+    default: {
+      const bits = [`#${e.deviceId} ${e.status ?? ''}`];
+      if (e.temperature_c != null) bits.push(`${e.temperature_c} °C`);
+      if (e.node) {
+        if (e.node.humidity != null) bits.push(`hum ${e.node.humidity}%`);
+        if (e.node.presence != null) bits.push(e.node.presence ? 'presencia' : 'sin presencia');
+        if (e.node.alarm) bits.push('ALARMA');
+      }
+      bits.push(compact(e.reported ?? {}));
+      return bits.join(' · ');
+    }
+  }
+}
+
+function visible(e) {
+  if ($('hideTelemetry').checked && e.kind === 'telemetry') return false;
+  if ($('onlyHardware').checked && state.devices.get(e.deviceId)?.source !== 'hardware') return false;
+  return true;
+}
+
+function renderTimeline() {
+  const box = $('timeline');
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  box.replaceChildren();
+  const rows = state.events.filter(visible);
+  rows.forEach(e => {
+    const row = el('div', 'row' + (e.kind === 'command_executed' ? ' exec' : e.kind === 'command_sent' ? ' cmd' : ''));
+    row.append(el('span', 't', hhmmss(e.at)), el('span', 'k ' + e.kind, KIND_LABEL[e.kind] ?? e.kind),
+      el('span', 'd', '#' + e.deviceId), el('span', '', describe(e)));
+    box.append(row);
+  });
+  $('count').textContent = `${rows.length} eventos`;
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+
+function renderCards() {
+  const box = $('cards');
+  box.replaceChildren();
+  if (!state.devices.size) { box.append(el('div', 'empty', 'Esperando datos de los dispositivos…')); return; }
+  [...state.devices.values()].sort((a, b) => a.id - b.id).forEach(d => {
+    const card = el('div', 'card ' + d.source);
+    const title = el('h3');
+    title.append(el('span', '', `#${d.id} ${d.type ?? ''}`), el('span', 'tag ' + d.source, d.source === 'hardware' ? 'ESP32 real' : 'simulador'));
+    const kv = el('div', 'kv');
+    const add = (k, v) => { if (v != null && v !== '') kv.append(el('span', '', k), el('span', '', String(v))); };
+    add('Estado', d.status);
+    add('Temperatura', d.temperature_c != null ? d.temperature_c + ' °C' : null);
+    if (d.node) {
+      add('Humedad', d.node.humidity != null ? d.node.humidity + ' %' : null);
+      add('Presencia', d.node.presence != null ? (d.node.presence ? 'sí' : 'no') : null);
+      add('Persiana', d.node.blind_deg != null ? d.node.blind_deg + '°' : null);
+      add('Alarma', d.node.alarm != null ? (d.node.alarm ? 'ACTIVA' : 'no') : null);
+    }
+    add('Reportado', d.reported && Object.keys(d.reported).length ? compact(d.reported) : null);
+    add('Visto', d.last_seen ? hhmmss(d.last_seen) : null);
+    card.append(title, kv);
+    box.append(card);
+  });
+}
+
+function setDevices(list) { state.devices = new Map(list.map(d => [d.id, d])); }
+function setMqtt(on) {
+  const pill = $('mqtt');
+  pill.textContent = 'broker MQTT: ' + (on ? 'conectado' : 'sin conexión');
+  pill.className = 'pill ' + (on ? 'on' : 'off');
+}
+
+function connect() {
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { $('ws').textContent = 'página en vivo'; $('ws').className = 'pill on'; };
+  ws.onclose = () => { $('ws').textContent = 'página sin conexión'; $('ws').className = 'pill off'; setTimeout(connect, 2000); };
+  ws.onmessage = msg => {
+    const data = JSON.parse(msg.data);
+    if (data.type === 'snapshot') {
+      state.events = data.events; setDevices(data.devices); setMqtt(data.mqtt);
+    } else if (data.type === 'events') {
+      state.events.push(...data.events); state.events = state.events.slice(-500); setDevices(data.devices);
+    } else if (data.type === 'status') {
+      setMqtt(data.mqtt); return;
+    }
+    renderCards(); renderTimeline();
+  };
+}
+$('hideTelemetry').onchange = $('onlyHardware').onchange = renderTimeline;
+connect();
+</script>
+</body>
+</html>
