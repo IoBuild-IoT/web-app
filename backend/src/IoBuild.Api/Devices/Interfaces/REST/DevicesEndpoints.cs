@@ -9,6 +9,9 @@ namespace IoBuild.Api.Devices.Interfaces.REST;
 
 public static class DevicesEndpoints
 {
+    // Hardware reports every few seconds; this much silence means it is disconnected.
+    private static readonly TimeSpan OfflineAfter = TimeSpan.FromSeconds(10);
+
     // Builders access devices in their own projects. Owners access only devices
     // attached to units assigned to them. Use the same boundary for reads and mutations.
     private static async Task<bool> CanAccessDeviceAsync(System.Security.Claims.ClaimsPrincipal user, IoBuild.Api.Persistence.IoBuildDbContext db, IoBuild.Api.Devices.Domain.Model.Aggregates.Device device, CancellationToken ct)
@@ -40,7 +43,15 @@ public static class DevicesEndpoints
                 new { code = "WaterSensor", displayName = "Water Sensor", scope = "floor", controllableAttributes = Array.Empty<object>() },
                 new { code = "SmokeDetector", displayName = "Smoke Detector", scope = "floor", controllableAttributes = Array.Empty<object>() },
                 new { code = "AirConditioner", displayName = "Air Conditioner", scope = "unit", controllableAttributes = new object[] { new { name = "targetTemperature", type = "number", min = 16, max = 30, unit = "C", enumMembers = (string[]?)null }, new { name = "mode", type = "enum", min = (double?)null, max = (double?)null, unit = (string?)null, enumMembers = new[] { "cooling", "heating", "fan" } }, new { name = "power", type = "boolean", min = (double?)null, max = (double?)null, unit = (string?)null, enumMembers = (string[]?)null } } },
-                new { code = "SmartLight", displayName = "Smart Light", scope = "unit", controllableAttributes = new object[] { new { name = "brightness", type = "number", min = 0, max = 100, unit = "%", enumMembers = (string[]?)null }, new { name = "power", type = "boolean", min = (double?)null, max = (double?)null, unit = (string?)null, enumMembers = (string[]?)null } } }
+                new { code = "SmartLight", displayName = "Smart Light", scope = "unit", controllableAttributes = new object[] { new { name = "brightness", type = "number", min = 0, max = 100, unit = "%", enumMembers = (string[]?)null }, new { name = "power", type = "boolean", min = (double?)null, max = (double?)null, unit = (string?)null, enumMembers = (string[]?)null } } },
+                new
+                {
+                    code = "EdgeNode", displayName = "Edge Node (ESP32)", scope = "unit",
+                    controllableAttributes = EdgeNodeSettings.Numeric
+                        .Select(setting => (object)new { name = setting.Name, type = "number", min = (double?)setting.Min, max = (double?)setting.Max, unit = (string?)setting.Unit, enumMembers = (string[]?)null, step = (double?)setting.Step, @default = (object?)setting.Default })
+                        .Concat(EdgeNodeSettings.Booleans.Select(setting => (object)new { name = setting.Name, type = "boolean", min = (double?)null, max = (double?)null, unit = (string?)null, enumMembers = (string[]?)null, step = (double?)null, @default = (object?)setting.Default }))
+                        .ToArray()
+                }
             }
         };
 
@@ -133,7 +144,7 @@ public static class DevicesEndpoints
             var start = from ?? DateTimeOffset.UtcNow.AddDays(-1); var end = to ?? DateTimeOffset.UtcNow;
             return Results.Ok(await db.DeviceTelemetry.Where(item => item.DeviceId == id && item.OccurredAt >= start && item.OccurredAt <= end).OrderBy(item => item.OccurredAt).Select(item => new { timestamp = item.OccurredAt, energyKwh = item.EnergyKwh, temperatureC = item.TemperatureC, voltageV = item.VoltageV }).ToListAsync(ct));
         }).RequireAuthorization();
-        group.MapGet("/devices/{id:int}/status", async (int id, System.Security.Claims.ClaimsPrincipal user, IoBuildDbContext db, CancellationToken ct) =>
+        group.MapGet("/devices/{id:int}/status", async (int id, System.Security.Claims.ClaimsPrincipal user, IoBuildDbContext db, IoBuild.Api.Analytics.Application.Internal.QueryServices.ILiveDeviceStatusService live, CancellationToken ct) =>
         {
             var device = await db.Devices.FindAsync([id], ct);
             if (device is null || !await CanAccessDeviceAsync(user, db, device, ct)) return Results.NotFound(new { message = $"Device with ID {id} not found" });
@@ -170,7 +181,10 @@ public static class DevicesEndpoints
                 lastSeen,
                 temperatureC = tempC,
                 voltageV = voltV,
-                desired
+                // `status` follows the commanded power; `connected` says whether the hardware is really reporting.
+                connected = telemetry is not null && DateTimeOffset.UtcNow - telemetry.OccurredAt <= OfflineAfter,
+                desired,
+                node = await live.GetLatestNodeAsync(id, ct)
             });
         }).RequireAuthorization();
     }
