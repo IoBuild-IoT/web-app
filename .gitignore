@@ -52,3 +52,7 @@ temp_interactive_push.bat
 # Local scratch / generated compose dumps (may embed secrets)
 docker-compose.*.merged.yml
 shipping.js
+
+# Firmware ESP32: credenciales locales
+hardware/firmware/**/secrets.h
+hardware/demo-local.md
