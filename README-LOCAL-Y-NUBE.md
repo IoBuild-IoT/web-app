@@ -9,7 +9,7 @@ datos y desplegar el frontend en la nube.
 
 ```
                    WiFi 2.4 GHz                       red Docker (iobuild-network)
- ┌──────────┐  MQTT :1883   ┌───────────┐   ┌──────────────┐   ┌──────────┐
+ ┌──────────┐  MQTT :1884   ┌───────────┐   ┌──────────────┐   ┌──────────┐
  │  ESP32   │ ────────────> │ Mosquitto │ ─>│ API .NET 9   │ ─>│  MySQL   │  estado, órdenes, historial
  │ (nodo)   │ <──────────── │  broker   │   │ iobuild-api  │ ─>│ InfluxDB │  telemetría en vivo
  └──────────┘ commands/{id} └───────────┘   └──────┬───────┘   └──────────┘
@@ -34,7 +34,7 @@ datos y desplegar el frontend en la nube.
 | nginx | `80` | Entrada única: front en `/`, API en `/api` |
 | iobuild-api | `8080` | API directa y Swagger (`/swagger`) |
 | frontend | interno | Vue compilado servido por su propio nginx |
-| mosquitto | `1883` | Broker MQTT, aquí se conecta el ESP32 |
+| mosquitto | `1884` | Broker MQTT, aquí se conecta el ESP32 (dentro de Docker usa 1883) |
 | mysql-monolith | interno | Base de datos principal |
 | influxdb | interno | Telemetría en vivo (perfil `telemetry`) |
 | simulator | interno | Dispositivos simulados |
@@ -111,7 +111,7 @@ docker compose --profile telemetry down
 3. Monitor serie a 115200. Debe aparecer:
 
    ```
-   [MQTT] conectado a 192.168.x.x:1883 (IP nodo ...)
+   [MQTT] conectado a 192.168.x.x:1884 (IP nodo ...)
    PLATAFORMA: CONECTADO
    ... nube=OK
    ```
@@ -176,7 +176,7 @@ cd frontend && npm ci && npx vitest run && npm run build
 docker run --rm -v "$PWD:/src" -w /src mcr.microsoft.com/dotnet/sdk:9.0 dotnet test backend/IoBuild.sln
 ```
 
-E2E con Docker (usan los puertos 80/8080/1883: detén antes el stack local):
+E2E con Docker (usan los puertos 80/8080/1884: detén antes el stack local):
 
 ```bash
 bash backend/tests/Integration/run_esp32_node_e2e.sh
@@ -227,7 +227,7 @@ bash backend/tests/Integration/run_edge_node_settings_e2e.sh
 **Fase 0. Preparación (≈1 h)**
 1. Contratar VPS/VM Ubuntu 22.04/24.04, **2 vCPU y 4 GB RAM** mínimo.
 2. Dominio o subdominio (ej. `app.tu-dominio.com`) apuntando a la IP pública (registro A).
-3. Firewall del proveedor: abrir `22`, `80`, `443` y `1883/TCP`. **No** abrir `8090` ni `3306`.
+3. Firewall del proveedor: abrir `22`, `80`, `443` y `1884/TCP`. **No** abrir `8090` ni `3306`.
 
 **Fase 1. Servidor (≈1 h)**
 1. Instalar Docker (o Dokploy) en el VPS.
@@ -285,7 +285,7 @@ bash backend/tests/Integration/run_edge_node_settings_e2e.sh
 
 | Riesgo | Mitigación |
 |---|---|
-| MQTT en 1883 viaja sin cifrar | Aceptable para la demo con usuario/clave; producción: TLS en 8883 y `WiFiClientSecure` en el ESP32 |
+| MQTT en 1884 viaja sin cifrar | Aceptable para la demo con usuario/clave; producción: TLS en 8883 y `WiFiClientSecure` en el ESP32 |
 | Front HTTPS llamando a API HTTP | Bloqueado por el navegador: usar opción A o dar HTTPS a la API |
 | `iot-monitor` sin login | No exponerlo; usar túnel SSH (`ssh -L 8090:localhost:8090 usuario@IP`) |
 | Redes con portal cautivo (universidad) | El ESP32 no puede pasarlas: usar hotspot del celular |
