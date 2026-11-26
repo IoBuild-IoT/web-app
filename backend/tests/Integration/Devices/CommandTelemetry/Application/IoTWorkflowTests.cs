@@ -7,6 +7,7 @@ using IoBuild.Api.Devices.Infrastructure.Mqtt;
 using IoBuild.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace IoBuild.Integration.Tests.Devices.CommandTelemetry.Application;
 
@@ -113,6 +114,73 @@ public sealed class IoTWorkflowTests
         var telemetry = new DeviceTelemetryService(db, new RecordingInfluxSink());
         await telemetry.IngestAsync(new TelemetryMessage(9, command.CommandId, command.IssuedAt, "online", "{\"brightness\":80}", 0.1));
         Assert.True((await db.DeviceCommands.SingleAsync()).AcknowledgedAt.HasValue);
+    }
+
+    [Fact]
+    [Trait("Category", "IoT")]
+    public async Task Edge_node_thresholds_accumulate_in_one_retained_desired_state_and_ack_on_full_echo()
+    {
+        await using var db = Db();
+        db.Devices.Add(new Device { Id = 30, Name = "ESP32", Type = "EdgeNode", Location = "Lab", ProjectId = 1, Status = "online", OwnerId = 4 });
+        await db.SaveChangesAsync();
+        var mqtt = new RecordingMqttPublisher();
+        var commands = new DeviceCommandService(db, mqtt);
+
+        await commands.SendAsync(30, 4, "climateDelta", JsonSerializer.SerializeToElement(2.5));
+        await commands.SendAsync(30, 4, "lightHoldSeconds", JsonSerializer.SerializeToElement(30));
+        var last = await commands.SendAsync(30, 4, "alarmEnabled", JsonSerializer.SerializeToElement(false));
+
+        Assert.Equal("commands/30", mqtt.Topic);
+        Assert.True(mqtt.QoS1 && mqtt.Retain);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("{\"climateDelta\":2.5,\"lightHoldSeconds\":30,\"alarmEnabled\":false}"), JsonNode.Parse(mqtt.Payload)), mqtt.Payload);
+
+        var telemetry = new DeviceTelemetryService(db, new RecordingInfluxSink());
+        await telemetry.IngestAsync(new TelemetryMessage(30, "esp32-30-ack", last.IssuedAt, "online", "{\"alarmEnabled\":false,\"climateDelta\":2.5,\"lightHoldSeconds\":30}", 0));
+        Assert.True((await db.DeviceCommands.SingleAsync(command => command.CommandId == last.CommandId)).AcknowledgedAt.HasValue);
+    }
+
+    [Fact]
+    [Trait("Category", "IoT")]
+    public async Task Edge_node_servo_and_motion_sensor_are_controllable_and_accumulate_in_the_desired_state()
+    {
+        await using var db = Db();
+        db.Devices.Add(new Device { Id = 32, Name = "ESP32", Type = "EdgeNode", Location = "Lab", ProjectId = 1, Status = "online", OwnerId = 4 });
+        await db.SaveChangesAsync();
+        var mqtt = new RecordingMqttPublisher();
+        var commands = new DeviceCommandService(db, mqtt);
+
+        await commands.SendAsync(32, 4, "blindAuto", JsonSerializer.SerializeToElement(false));
+        await commands.SendAsync(32, 4, "blindAngle", JsonSerializer.SerializeToElement(90));
+        await commands.SendAsync(32, 4, "blindAngle", JsonSerializer.SerializeToElement(0));
+        await commands.SendAsync(32, 4, "motionEnabled", JsonSerializer.SerializeToElement(false));
+
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("{\"blindAuto\":false,\"blindAngle\":0,\"motionEnabled\":false}"), JsonNode.Parse(mqtt.Payload)), mqtt.Payload);
+    }
+
+    [Theory]
+    [Trait("Category", "IoT")]
+    [InlineData("climateDelta", "0.4")]
+    [InlineData("climateDelta", "5.1")]
+    [InlineData("alarmDelta", "\"3\"")]
+    [InlineData("lightHoldSeconds", "601")]
+    [InlineData("blindStep", "true")]
+    [InlineData("alarmEnabled", "1")]
+    [InlineData("motionEnabled", "\"yes\"")]
+    [InlineData("blindAuto", "0")]
+    [InlineData("blindAngle", "181")]
+    [InlineData("blindAngle", "-5")]
+    [InlineData("blindAngle", "\"90\"")]
+    [InlineData("power", "true")]
+    public async Task Edge_node_rejects_out_of_range_wrong_type_and_unknown_settings(string attribute, string rawValue)
+    {
+        await using var db = Db();
+        db.Devices.Add(new Device { Id = 31, Name = "ESP32", Type = "EdgeNode", Location = "Lab", ProjectId = 1, Status = "online", OwnerId = 4 });
+        await db.SaveChangesAsync();
+        var mqtt = new RecordingMqttPublisher();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => new DeviceCommandService(db, mqtt).SendAsync(31, 4, attribute, JsonDocument.Parse(rawValue).RootElement.Clone()));
+        Assert.Empty(await db.DeviceCommands.ToListAsync());
+        Assert.Equal(string.Empty, mqtt.Topic);
     }
 
     [Fact]
