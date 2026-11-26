@@ -4,7 +4,7 @@ services:
     build:
       context: ./backend
       dockerfile: src/IoBuild.Api/Dockerfile
-    container_name: iobuild-api
+    container_name: iobuild-api-iot
     restart: unless-stopped
     environment:
       - ASPNETCORE_URLS=http://+:8080
@@ -16,7 +16,7 @@ services:
 
   mysql-monolith:
     image: mysql:8.0
-    container_name: iobuild-mysql-monolith
+    container_name: iobuild-mysql-monolith-iot
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=iobuild
@@ -30,7 +30,7 @@ services:
   # Jaeger — optional OTLP collector; app must start healthy when absent
   jaeger:
     image: jaegertracing/all-in-one:1.62
-    container_name: iobuild-jaeger
+    container_name: iobuild-jaeger-iot
     restart: unless-stopped
     ports:
       - "16686:16686"
@@ -44,14 +44,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: iobuild-frontend
+    container_name: iobuild-frontend-iot
     restart: unless-stopped
     depends_on:
       - iobuild-api
 
   nginx:
     image: nginx:alpine
-    container_name: iobuild-nginx-cutover
+    container_name: iobuild-nginx-cutover-iot
     restart: unless-stopped
     ports:
       - "8081:80"

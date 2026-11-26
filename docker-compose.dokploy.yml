@@ -17,7 +17,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: iobuild-api
+    container_name: iobuild-api-iot
     restart: unless-stopped
     environment:
       - ASPNETCORE_URLS=http://+:8080
@@ -56,7 +56,7 @@ services:
 
   mysql-monolith:
     image: mysql:8.0
-    container_name: iobuild-mysql-monolith
+    container_name: iobuild-mysql-monolith-iot
     restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-iobuild}
@@ -75,7 +75,7 @@ services:
   # Do not add a host `ports` mapping here; Traefik routes to container port 80.
   phpmyadmin:
     image: phpmyadmin:5.2-apache
-    container_name: iobuild-phpmyadmin
+    container_name: iobuild-phpmyadmin-iot
     restart: unless-stopped
     environment:
       PMA_HOST: mysql-monolith
@@ -96,7 +96,7 @@ services:
         - VITE_CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
         - VITE_CLOUDINARY_UPLOAD_PRESET=${VITE_CLOUDINARY_UPLOAD_PRESET:-}
         - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY:-}
-    container_name: iobuild-frontend
+    container_name: iobuild-frontend-iot
     restart: unless-stopped
     depends_on:
       - iobuild-api
@@ -107,7 +107,7 @@ services:
 
   jaeger:
     image: jaegertracing/all-in-one:1.62
-    container_name: iobuild-jaeger
+    container_name: iobuild-jaeger-iot
     restart: unless-stopped
     expose:
       - "16686"
@@ -123,7 +123,7 @@ services:
 
   influxdb:
     image: influxdb:2.7-alpine
-    container_name: iobuild-influxdb
+    container_name: iobuild-influxdb-iot
     restart: unless-stopped
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -145,7 +145,7 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2-openssl
-    container_name: iobuild-mosquitto
+    container_name: iobuild-mosquitto-iot
     restart: unless-stopped
     # MQTT clients outside Docker connect directly to the VPS; Traefik Domains
     # only handles HTTP and cannot replace this TCP port mapping.
@@ -169,7 +169,7 @@ services:
     build:
       context: ./iot-simulator
       dockerfile: Dockerfile
-    container_name: iobuild-simulator
+    container_name: iobuild-simulator-iot
     restart: unless-stopped
     environment:
       - MQTT_HOST=mosquitto
@@ -189,7 +189,7 @@ services:
     build:
       context: ./iot-monitor
       dockerfile: Dockerfile
-    container_name: iobuild-iot-monitor
+    container_name: iobuild-iot-monitor-iot
     restart: unless-stopped
     environment:
       - MQTT_HOST=mosquitto
