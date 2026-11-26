@@ -111,3 +111,81 @@ skip_reasons:
   G0: No independent pure domain rule changed; authorization is verified at the API boundary.
 open_risks: []
 ```
+
+## ESP32 edge-node readings and MQTT ingest hardening (2026-11-21)
+
+Real ESP32 `node{}` readings (humidity, presence, blind, alarm) are returned by
+`GET /api/v1/devices/{id}/status` as `node` (latest values from InfluxDB) and shown
+in the Builder and Owner telemetry status cards. MQTT ingest now logs rejected
+payloads instead of swallowing them, rounds decimal `blind_deg`, and uses server
+time when the node reports a pre-NTP (1970) timestamp.
+
+```yaml
+journey: DEVICES.EDGE_NODE (ESP32 telemetry → status card)
+gates:
+  G0: passed (ParseTelemetry/ParseNode parser rules; LiveDeviceStatusService node CSV mapping)
+  G1: passed (full backend suite; frontend unit contracts and production build)
+  G2: passed (disposable Compose stack, mosquitto_pub ESP32 payload → /status node, malformed payload logged)
+  G3: partial (malformed JSON, decimal blind, unsynced clock, missing node covered; no auth change)
+  G4: not run (single run of each layer)
+commands:
+  - command: dotnet test backend/IoBuild.sln (sdk:9.0 container)
+    result: 274/274 passed (Architecture 17, Contract 20, Integration 50, Modules 187)
+  - command: npx vitest run && npx vite build (from frontend/)
+    result: 79/79 passed; build OK
+  - command: python -m unittest discover -s iot-simulator / -s iot-monitor
+    result: OK / 8/8 passed
+  - command: bash backend/tests/Integration/run_esp32_node_e2e.sh
+    result: PASS (stack and volumes removed)
+skip_reasons:
+  G4: deterministic rerun not performed in this session.
+open_risks:
+  - Dashboard rendering of node rows verified by build only, not by browser E2E.
+  - Firmware (IoBuild-IoT/edge-node) not in this repo; NTP sync on the node unverified.
+  - POST /api/v1/devices/telemetry is AllowAnonymous (pre-existing).
+
+## EdgeNode configurable thresholds (2026-11-21)
+
+```yaml
+journey: DEVICES.EDGE_NODE_SETTINGS (Owner tunes ESP32 thresholds → retained command → node echo acks)
+actor_coverage: { Owner: sends settings (G2), Builder: refused 403 (G2) }
+gates:
+  G0: passed (range/type/unknown-attribute validation theory, 7 cases)
+  G1: passed (accumulated desired state retained QoS1; full echo acknowledges)
+  G2: passed (Compose stack: catalog, Owner commands, 400 out-of-range, 403 Builder, retained payload, ack in MySQL, /status desired+node)
+  G3: partial (no cross-field rule alarmDelta > climateDelta; documented, not enforced)
+  G4: passed (both e2e scripts rerun from clean state)
+commands:
+  - command: dotnet test backend/IoBuild.sln (sdk:9.0 container)
+    result: 282/282 passed
+  - command: npx vitest run && npx vite build (from frontend/)
+    result: 79/79 passed; build OK
+  - command: bash backend/tests/Integration/run_edge_node_settings_e2e.sh
+    result: PASS
+  - command: bash backend/tests/Integration/run_esp32_node_e2e.sh
+    result: PASS (regression)
+diagnostic_verdicts:
+  - failure: first run, command not acknowledged
+    class: test
+    root_cause: test telemetry timestamp truncated to the second, older than IssuedAt; backend correctly ignores pre-command echoes
+    fix: millisecond UTC timestamp in the script
+open_risks:
+  - Firmware side (NVS + echo) delivered as reference snippet only; edge-node repo not available here.
+  - Control labels show raw attribute names (existing behavior for all types).
+
+## Owner control board and servo control (2026-11-24)
+
+```yaml
+journey: DEVICES.CONTROL_BOARD (Owner controls each prototype component; servo manual/auto)
+actor_coverage: { Owner: all components (G0-G2), Builder: unchanged, sees no control board }
+gates:
+  G0: passed (control-layout rules: cards per device, defaults, lock-only-when-explicitly-off, live state, servo commands, stale readings)
+  G1: passed (catalog 8 EdgeNode attributes; blindAngle 0-180, boolean validation, accumulated desired state; node light/climate through Influx)
+  G2: partial (integrated browser on the local stack: manual blind + Open -> retained commands/18 {blindAuto:false,blindAngle:180}; Playwright spec updated but not executed)
+  G3: partial (out-of-range angle, wrong types, unknown attribute; board rolls back on failed command)
+  G4: not run
+open_risks:
+  - Firmware servo/PIR changes compile (ESP32) but were not flashed or observed on the board in this session.
+  - Playwright devices-control.spec.js was rewritten for the new board and not executed (browser download not approved).
+  - Live chips depend on the firmware reporting node.light/node.climate (new firmware only).
+```
