@@ -6,7 +6,10 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import StatCard from './stat-card.component.vue';
 import ProjectCard from './project-card.component.vue';
 import LiveEnergyChart from './live-energy-chart.component.vue';
+import NodeReadings from '../../../devices/presentation/components/node-readings.vue';
 import { useAnalyticsStore } from '../../application/analytics.store.js';
+import { useAutoRefresh } from '../../../shared/application/auto-refresh.js';
+import { DASHBOARD_REFRESH_MS } from '../../../shared/infrastructure/constants.js';
 import { useIamStore } from '../../../iam/application/iam.store.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler);
@@ -174,6 +177,12 @@ onMounted(() => {
   analyticsStore.fetchDevices();
 });
 
+// Selected device's chart and status card refresh on their own, like the rest of the dashboard.
+useAutoRefresh(
+  () => (analyticsStore.selectedDeviceId ? fetchTelemetry(analyticsStore.selectedDeviceId) : null),
+  DASHBOARD_REFRESH_MS,
+);
+
 // Chart configurations
 const hourlyEnergyChartData = computed(() => {
   if (!props.dashboard?.hourlyEnergyData?.length) return null;
@@ -279,6 +288,8 @@ const deviceTypeIcons = {
   'airconditioner': 'pi-sync',
   'SmartLight': 'pi-lightbulb',
   'smartlight': 'pi-lightbulb',
+  'EdgeNode': 'pi-microchip',
+  'edgenode': 'pi-microchip',
   'Temperature': 'pi-chart-line',
   'temperature': 'pi-chart-line',
   'Humidity': 'pi-cloud',
@@ -408,7 +419,7 @@ const translateDeviceType = (type) => {
     <!-- Live Energy Chart -->
     <div class="chart-container live-energy-section">
       <h3 class="chart-title">Live Energy — Last {{ liveMinutes }} min</h3>
-      <p class="chart-subtitle">Auto-refreshes every 30s</p>
+      <p class="chart-subtitle">Auto-refreshes every {{ DASHBOARD_REFRESH_MS / 1000 }}s</p>
       <div class="chart-wrapper">
         <LiveEnergyChart v-if="userId" :user-id="userId" role="builder" :minutes="liveMinutes" />
       </div>
@@ -470,6 +481,7 @@ const translateDeviceType = (type) => {
               <span class="status-label">{{ $t('devices.telemetry.voltage') }}</span>
               <span class="status-value">{{ analyticsStore.deviceStatus.voltageV != null ? `${analyticsStore.deviceStatus.voltageV.toFixed(1)} V` : '—' }}</span>
             </div>
+            <NodeReadings :node="analyticsStore.deviceStatus.node" />
           </div>
           <div v-else-if="analyticsStore.telemetryLoading" class="no-data">
             {{ $t('devices.telemetry.loading') }}
