@@ -1,0 +1,18 @@
+# Compilar el firmware del ESP32 en Docker (sin Arduino IDE).
+#   docker compose -f hardware/firmware/docker-compose.yml run --rm firmware
+# Resultado: hardware/firmware/build/iobuild_edge_node.ino.merged.bin (y los .bin sueltos)
+# Requiere hardware/firmware/iobuild_edge_node/secrets.h (no está en git).
+services:
+  firmware:
+    build: .
+    image: iobuild-edge-node-firmware
+    volumes:
+      - type: bind
+        source: ./iobuild_edge_node
+        target: /sketch
+        read_only: true
+      - type: bind
+        source: ./build
+        target: /out
+        bind:
+          create_host_path: true
