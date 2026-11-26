@@ -15,6 +15,8 @@ public interface ILiveEnergyService
 public interface ILiveDeviceStatusService
 {
     Task<Dictionary<string, string>> GetLatestStatusesAsync(IEnumerable<string> deviceIds, CancellationToken ct = default);
+    /// <summary>Latest edge-node readings (humidity_pct, presence, blind_deg, alarm) for one device; null when Influx has none.</summary>
+    Task<Dictionary<string, object>?> GetLatestNodeAsync(int deviceId, CancellationToken ct = default) => Task.FromResult<Dictionary<string, object>?>(null);
 }
 
 public interface IAnalyticsQueryService
