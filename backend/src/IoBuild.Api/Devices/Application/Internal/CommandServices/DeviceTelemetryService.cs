@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace IoBuild.Api.Devices.Application.Internal.CommandServices;
 
-public sealed record NodeSample(double? HumidityPct = null, bool? Presence = null, int? BlindDeg = null, bool? Alarm = null);
+/// <summary>Edge-node readings. Light/Climate are the real relay states (not the desired power).</summary>
+public sealed record NodeSample(double? HumidityPct = null, bool? Presence = null, int? BlindDeg = null, bool? Alarm = null, bool? Light = null, bool? Climate = null);
 public sealed record TelemetryMessage(int DeviceId, string EventId, DateTimeOffset OccurredAt, string Status, string ReportedJson, double EnergyKwh, double TemperatureC = 0, double VoltageV = 0, NodeSample? Node = null);
 public interface IInfluxTelemetrySink { Task WriteAsync(TelemetryMessage message, CancellationToken cancellationToken = default); }
 public interface IDeviceMqttPublisher { Task PublishAsync(string topic, string payload, bool qos1, bool retain, CancellationToken cancellationToken = default); }
