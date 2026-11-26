@@ -8,7 +8,7 @@ desplegarla en una VM para que el ESP32 se conecte desde cualquier red.
 ## 0. Cómo funciona (en una línea)
 
 ```
-ESP32 ──WiFi──> Internet ──MQTT :1883──> Mosquitto ──> Backend (.NET) ──> MySQL + InfluxDB ──> Front (Vue)
+ESP32 ──WiFi──> Internet ──MQTT :1884──> Mosquitto ──> Backend (.NET) ──> MySQL + InfluxDB ──> Front (Vue)
    ↑                                                     │
    └──────────── órdenes commands/{id} (retenidas) ──────┘
 ```
@@ -52,7 +52,7 @@ Arduino IDE → Herramientas → Puerto `/dev/cu.usbserial-0001` → Monitor ser
 Debes ver:
 
 ```
-[MQTT] conectado a <host>:1883 (IP nodo 192.168.x.x)
+[MQTT] conectado a <host>:1884 (IP nodo 192.168.x.x)
 PLATAFORMA: CONECTADO
 [MQTT] orden commands/18: {...}        <- cuando cambias algo en la app
 [  43s] T=27.2°C HR=78% ... nube=OK
@@ -141,7 +141,7 @@ Apagar: `docker compose --profile telemetry down` (los datos se conservan).
 |---|---|---|
 | 22/TCP | SSH | Sí (idealmente solo tu IP) |
 | 80/TCP | Front + API (nginx) | Sí |
-| 1883/TCP | MQTT del ESP32 | Sí |
+| 1884/TCP | MQTT del ESP32 | Sí |
 | 8080/TCP | API directa | Opcional |
 | 8090/TCP | Monitor MQTT (sin login) | **No** (úsalo con túnel SSH) |
 
@@ -213,11 +213,11 @@ docker compose -f docker-compose.yml -f docker-compose.vm.yml --profile telemetr
 ### 4.7 Probar el broker desde fuera (desde tu PC)
 
 ```bash
-docker run --rm eclipse-mosquitto:2 mosquitto_sub -h IP_PUBLICA -p 1883 -u iobuild -P 'TU_MQTT_PASSWORD' -t 'telemetry/#' -v -C 3
+docker run --rm eclipse-mosquitto:2 mosquitto_sub -h IP_PUBLICA -p 1884 -u iobuild -P 'TU_MQTT_PASSWORD' -t 'telemetry/#' -v -C 3
 ```
 
 Si muestra mensajes o se queda esperando sin error, el puerto está abierto. `Connection refused`
-o timeout = puerto 1883 cerrado en el firewall del proveedor.
+o timeout = puerto 1884 cerrado en el firewall del proveedor.
 
 ---
 
@@ -229,7 +229,7 @@ Edita `hardware/firmware/iobuild_edge_node/secrets.h`:
 #define WIFI_SSID "nombre-de-tu-red-2.4GHz"   // nombre, NO la MAC del router
 #define WIFI_PASS "clave-wifi"
 #define MQTT_HOST "IP_PUBLICA_DE_LA_VM"
-#define MQTT_PORT 1883
+#define MQTT_PORT 1884
 #define MQTT_USER "iobuild"
 #define MQTT_PASS "el MQTT_PASSWORD del .env de la VM"
 #define ID_LUZ   <idLuz>
@@ -268,7 +268,7 @@ usa el hotspot del celular en la presentación.
 | Síntoma (monitor serie) | Causa | Solución |
 |---|---|---|
 | `[WiFi] conectando a ...` sin parar | SSID/clave mal, red 5 GHz o portal cautivo | Nombre exacto de red 2.4 GHz; prueba hotspot del celular |
-| `[MQTT] sin conexión (estado -2)` | No llega al broker | IP/host mal, puerto 1883 cerrado, o cambió la IP de tu PC |
+| `[MQTT] sin conexión (estado -2)` | No llega al broker | IP/host mal, puerto 1884 cerrado, o cambió la IP de tu PC |
 | `estado 4` o `5` | Usuario/clave MQTT incorrectos | `MQTT_USER`/`MQTT_PASS` = valores del `.env` de la VM |
 | Conecta pero el dashboard no cambia | IDs de `secrets.h` ≠ IDs de la app | Revisa los IDs (paso 4.5) |
 | Valores que saltan solos | Falta `HARDWARE_DEVICE_IDS` | Paso 4.6 |
@@ -283,7 +283,7 @@ Un JSON inválido aparece como `telemetry rejected`.
 
 ## 8. Seguridad (para producción, no bloquea la demo)
 
-- MQTT en 1883 va **sin cifrar**: para producción usar TLS en 8883 y `WiFiClientSecure` en el ESP32.
+- MQTT en 1884 va **sin cifrar**: para producción usar TLS en 8883 y `WiFiClientSecure` en el ESP32.
 - No abras 8090 (monitor) ni 3306 (MySQL) a internet. Para ver el monitor: `ssh -L 8090:localhost:8090 usuario@IP_PUBLICA` y abre http://localhost:8090.
 - Cambia `JWT_SECRET` y contraseñas de la base antes de usar datos reales.
 - Front en Hostinger (HTTPS) llamando a la VM por HTTP será bloqueado por el navegador
