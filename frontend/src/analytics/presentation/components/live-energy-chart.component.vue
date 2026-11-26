@@ -13,6 +13,7 @@ import {
   Filler
 } from 'chart.js';
 import { useAnalyticsStore } from '../../application/analytics.store.js';
+import { DASHBOARD_REFRESH_MS } from '../../../shared/infrastructure/constants.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -35,7 +36,7 @@ const props = defineProps({
 const analyticsStore = useAnalyticsStore();
 
 onMounted(() => {
-  analyticsStore.startLiveEnergyPolling(props.userId, props.role, props.minutes);
+  analyticsStore.startLiveEnergyPolling(props.userId, props.role, props.minutes, DASHBOARD_REFRESH_MS);
 });
 
 onUnmounted(() => {
