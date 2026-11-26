@@ -1,5 +1,5 @@
 # Override para una VM con IP pública (sin Dokploy): mismo stack que docker-compose.yml,
-# pero el broker MQTT exige usuario/clave porque el puerto 1883 queda abierto a internet.
+# pero el broker MQTT exige usuario/clave porque el puerto 1884 queda abierto a internet.
 # Uso:  docker compose -f docker-compose.yml -f docker-compose.vm.yml --profile telemetry up -d --build
 # Requiere MQTT_PASSWORD (y opcional MQTT_USERNAME, por defecto iobuild) en .env.
 services:
