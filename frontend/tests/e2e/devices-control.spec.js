@@ -76,14 +76,14 @@ test('DEVICES Owner happy path: provision, register, command, reflected status',
   })).json();
   expect(device.id).toBeGreaterThan(0);
 
-  // Drive brightness from the owner device table.
+  // Drive brightness from the owner's component card: the slider commits when released.
   await page.goto('/devices/device-management');
-  await expect(page.locator('.unit-devices-table')).toContainText('E2E Hall Light', { timeout: 20_000 });
-  const slider = page.locator('.control-panel input.native-slider').first();
-  await expect(slider).toHaveAccessibleName(/brightness$/);
+  await expect(page.locator('.unit-devices-board')).toContainText('E2E Hall Light', { timeout: 20_000 });
+  const card = page.locator('[data-card="light"]');
+  const slider = card.getByRole('slider', { name: /brightness$/i });
+  await expect(slider).toBeEnabled();
   await slider.fill('80');
-  await page.locator('.send-btn').first().click();
-  await expect(page.getByText('Command sent').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Change sent').first()).toBeVisible({ timeout: 20_000 });
 
   // The deployed stack reflects the desired state on the device status endpoint.
   const status = await (await page.request.get(`/api/v1/devices/${device.id}/status`, {
@@ -92,20 +92,17 @@ test('DEVICES Owner happy path: provision, register, command, reflected status',
   expect(status.deviceId).toBe(device.id);
   expect(JSON.stringify(status.desired)).toContain('80');
 
-  // Power OFF locks every other control, including its Send button; power stays usable.
-  const powerRow = page.locator('.control-row', { has: page.locator('.control-label', { hasText: /^power$/ }) });
-  const brightnessRow = page.locator('.control-row', { has: page.locator('.control-label', { hasText: /^brightness$/ }) });
-  await powerRow.locator('.control-select').click();
-  await page.getByRole('option', { name: 'Off' }).click();
-  await powerRow.locator('.send-btn').click();
-  await expect(brightnessRow.locator('input.native-slider')).toBeDisabled({ timeout: 20_000 });
-  await expect(brightnessRow.locator('.send-btn')).toBeDisabled();
-  await expect(powerRow.locator('.send-btn')).toBeEnabled();
+  // Power OFF locks every other control; the power switch itself stays usable.
+  const power = card.getByRole('switch', { name: /hallway light/i });
+  await expect(power).toBeEnabled();
+  await power.click();                       // unknown -> on
+  await expect(power).toHaveAttribute('aria-checked', 'true', { timeout: 20_000 });
+  await power.click();                       // on -> off
+  await expect(power).toHaveAttribute('aria-checked', 'false', { timeout: 20_000 });
+  await expect(slider).toBeDisabled({ timeout: 20_000 });
+  await expect(power).toBeEnabled();
 
   // Power ON unlocks them again.
-  await powerRow.locator('.control-select').click();
-  await page.getByRole('option', { name: 'On' }).click();
-  await powerRow.locator('.send-btn').click();
-  await expect(brightnessRow.locator('input.native-slider')).toBeEnabled({ timeout: 20_000 });
-  await expect(brightnessRow.locator('.send-btn')).toBeEnabled();
+  await power.click();
+  await expect(slider).toBeEnabled({ timeout: 20_000 });
 });
