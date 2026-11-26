@@ -78,3 +78,34 @@ roles_covered:
   - role: Owner
     happy_path: frontend/tests/e2e/analytics-view.spec.js (Owner test)
 ```
+
+## Live owner dashboard with real readings and 5 s refresh (2026-11-24)
+
+```yaml
+journey: ANALYTICS.LIVE_OWNER (owner sees what the real devices do now; changes show within seconds)
+actor_coverage: { Owner: live panel, stat cards, telemetry chart, 5 s refresh (G0-G2), Builder: 5 s silent refresh only }
+gates:
+  G0: passed (summarizeLive/isDeviceUp: fresh vs stale, one alarm alert, offline counting, hardware-first temperature, placeholders before first reading)
+  G1: passed (node Flux query bounded to -15m and per-device; node block incl. light/climate; full backend suite)
+  G2: passed (integrated browser on the local stack with the real ESP32: 8 live tiles filled with real values; blindAngle 0 sent by API -> tile moved 180 -> 89 -> 0 without reloading)
+  G3: partial (stale device -> offline banner covered in unit tests; not forced on the live stack)
+  G4: not run
+commands:
+  - command: dotnet test backend/IoBuild.sln (sdk:9.0 container)
+    result: 290/290 passed
+  - command: npx vitest run && npx vite build (from frontend/)
+    result: 110/110 passed; build OK
+diagnostic_verdicts:
+  - failure: live tiles showed "-" although the board was publishing node data
+    class: product
+    root_cause: node read used a 1-day Flux range; with the board reporting every 5 s it exceeded the 500 ms HttpClient timeout, which also triggered a 60 s shared cool-off returning node=null
+    fix: range -15m, 1500 ms client timeout, separate 10 s cool-off for the node read, test on the query window
+  - failure: new test LIVE_NODE_reads_only_a_short_recent_window failed
+    class: test
+    root_cause: assertion searched the raw JSON body, where System.Text.Json writes quotes as \u0022
+    fix: parse the body and assert on the Flux query text
+open_risks:
+  - Backend alertsCount is still hard-coded to 0 (alerts are derived in the front from live readings).
+  - /analytics metrics still read device status from InfluxDB over 30 days; same slowness risk as the node read, not changed here.
+  - Playwright specs not executed (browser download not approved).
+```
