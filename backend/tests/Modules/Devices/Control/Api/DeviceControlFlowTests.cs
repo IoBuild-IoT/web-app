@@ -44,6 +44,13 @@ public sealed class DeviceControlFlowTests
         var status = await (await SendAsync(client, HttpMethod.Get, "/api/v1/devices/511/status", owner)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(511, status.GetProperty("deviceId").GetInt32());
         Assert.Equal("online", status.GetProperty("status").GetString());
+        Assert.False(status.GetProperty("connected").GetBoolean());   // an old reading is not a live connection
+
+        using var fresh = await client.PostAsync("/api/v1/devices/telemetry",
+            Json($"{{\"deviceId\":511,\"eventId\":\"evt-now\",\"occurredAt\":\"{DateTimeOffset.UtcNow:O}\",\"status\":\"online\",\"reportedJson\":\"{{}}\",\"energyKwh\":0}}"));
+        Assert.Equal(HttpStatusCode.OK, fresh.StatusCode);
+        var live = await (await SendAsync(client, HttpMethod.Get, "/api/v1/devices/511/status", owner)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(live.GetProperty("connected").GetBoolean());
     }
 
     [Fact]
