@@ -63,6 +63,41 @@ public sealed partial class AnalyticsInfluxReadTests
     [Fact]
     [Trait("Flow", "ANALYTICS.LIVE")]
     [Trait("Layer", "Contract")]
+    [Trait("Risk", "B")]
+    public async Task LIVE_NODE_maps_latest_edge_node_fields_by_type()
+    {
+        const string nodeCsv = ",result,table,_field,_value,deviceId\r\n,_result,0,humidity_pct,55.5,8\r\n\r\n,result,table,_field,_value,deviceId\r\n,_result,1,presence,true,8\r\n,_result,2,alarm,false,8\r\n\r\n,result,table,_field,_value,deviceId\r\n,_result,3,blind_deg,180,8\r\n,_result,4,light,true,8\r\n,_result,5,climate,false,8\r\n";
+        var node = await new LiveDeviceStatusService(Client(HttpStatusCode.OK, nodeCsv), Configured()).GetLatestNodeAsync(8);
+
+        Assert.NotNull(node);
+        Assert.Equal(55.5, node["humidity_pct"]);
+        Assert.Equal(true, node["presence"]);
+        Assert.Equal(false, node["alarm"]);
+        Assert.Equal(180.0, node["blind_deg"]);
+        Assert.Equal(true, node["light"]);
+        Assert.Equal(false, node["climate"]);
+        Assert.Null(await new LiveDeviceStatusService(Client(HttpStatusCode.OK, ""), Configured()).GetLatestNodeAsync(8));
+    }
+
+    [Fact]
+    [Trait("Flow", "ANALYTICS.LIVE")]
+    [Trait("Layer", "Contract")]
+    [Trait("Risk", "B")]
+    public async Task LIVE_NODE_reads_only_a_short_recent_window_so_it_stays_fast_as_data_grows()
+    {
+        var handler = new CapturingHandler();
+        var node = await new LiveDeviceStatusService(new HttpClient(handler), Configured()).GetLatestNodeAsync(8);
+
+        Assert.Null(node);   // empty CSV: no node data yet
+        var flux = System.Text.Json.JsonDocument.Parse(handler.Body).RootElement.GetProperty("query").GetString()!;
+        Assert.Contains($"range(start: {LiveDeviceStatusService.NodeRange})", flux);
+        Assert.DoesNotContain("-1d", flux);
+        Assert.Contains("r.deviceId == \"8\"", flux);
+    }
+
+    [Fact]
+    [Trait("Flow", "ANALYTICS.LIVE")]
+    [Trait("Layer", "Contract")]
     [Trait("Risk", "C")]
     public async Task LIVE_READS_degrade_to_empty_when_influx_fails_is_unconfigured_or_malformed()
     {
@@ -87,6 +122,16 @@ public sealed partial class AnalyticsInfluxReadTests
     }).Build();
 
     private static HttpClient Client(HttpStatusCode status, string body) => new(new StubHandler(status, body));
+
+    private sealed class CapturingHandler : HttpMessageHandler
+    {
+        public string Body { get; private set; } = string.Empty;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty, Encoding.UTF8, "text/csv") };
+        }
+    }
 
     private sealed class StubHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
