@@ -19,6 +19,13 @@ export const RETRY_OWNER_DASHBOARD_MAX_ATTEMPTS = 4;
 
 export const TOAST_SUCCESS_DURATION_MS = 2500;
 
+// Live data refresh while the hardware is connected (dashboards and control board).
+export const DASHBOARD_REFRESH_MS = 3000;
+
+// Connection request: how many times the hardware is checked, and the pause between checks.
+export const HARDWARE_CONNECT_ATTEMPTS = 4;
+export const HARDWARE_CONNECT_WAIT_MS = 2000;
+
 export const TOAST_ERROR_DURATION_MS = 3000;
 
 export const TOAST_INVOICE_ERROR_DURATION_MS = 4000;
