@@ -9,7 +9,7 @@
 //  - Local (docker compose en tu PC): IP de tu PC en la red, ej. "192.168.1.59", sin usuario/clave
 //  - VPS (Dokploy): host público, MQTT_USER "iobuild" y MQTT_PASS = MQTT_PASSWORD de Dokploy
 #define MQTT_HOST "192.168.1.59"
-#define MQTT_PORT 1883
+#define MQTT_PORT 1884
 #define MQTT_USER ""
 #define MQTT_PASS ""
 
