@@ -6,15 +6,15 @@ Final monolith topology is one backend + one frontend + one MySQL. No YARP, no R
 
 | Service | Container | Purpose | Required |
 |---|---|---|---|
-| `iobuild-api` | `iobuild-api` | ASP.NET Core 9 monolith (8080) | yes |
-| `mysql-monolith` | `iobuild-mysql-monolith` | MySQL 8 (single DB `iobuild`) | yes |
-| `frontend` | `iobuild-frontend` | Vue SPA (built via `frontend/Dockerfile`) | yes |
-| `nginx` | `iobuild-nginx` | Edge proxy — `/api/` → `iobuild-api:8080`, SPA fallback | yes |
-| `phpmyadmin` | `iobuild-phpmyadmin` | MySQL administration UI (container port 80) | local profile `db-admin`; included in Dokploy stack |
-| `jaeger` | `iobuild-jaeger` | OTLP collector (4317/4318, UI 16686) | no — profile `observability` |
-| `influxdb` | `iobuild-influxdb` | Telemetry sink (profile `telemetry`) | no |
-| `mosquitto` | `iobuild-mosquitto` | MQTT broker (profile `telemetry`) | no |
-| `simulator` | `iobuild-simulator` | IoT generator (profile `telemetry`) | no |
+| `iobuild-api-iot` | `iobuild-api` | ASP.NET Core 9 monolith (8080) | yes |
+| `mysql-monolith` | `iobuild-mysql-monolith-iot` | MySQL 8 (single DB `iobuild`) | yes |
+| `frontend` | `iobuild-frontend-iot` | Vue SPA (built via `frontend/Dockerfile`) | yes |
+| `nginx` | `iobuild-nginx-iot` | Edge proxy — `/api/` → `iobuild-api:8080`, SPA fallback | yes |
+| `phpmyadmin` | `iobuild-phpmyadmin-iot` | MySQL administration UI (container port 80) | local profile `db-admin`; included in Dokploy stack |
+| `jaeger` | `iobuild-jaeger-iot` | OTLP collector (4317/4318, UI 16686) | no — profile `observability` |
+| `influxdb` | `iobuild-influxdb-iot` | Telemetry sink (profile `telemetry`) | no |
+| `mosquitto` | `iobuild-mosquitto-iot` | MQTT broker (profile `telemetry`); host port `1884` → container `1883` | no |
+| `simulator` | `iobuild-simulator-iot` | IoT generator (profile `telemetry`) | no |
 
 Optional services are profile-gated so the core stack (`docker compose up`) works without Influx/Mosquitto/Simulator.
 

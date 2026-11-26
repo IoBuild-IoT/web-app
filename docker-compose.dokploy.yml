@@ -150,7 +150,7 @@ services:
     # MQTT clients outside Docker connect directly to the VPS; Traefik Domains
     # only handles HTTP and cannot replace this TCP port mapping.
     ports:
-      - "1883:1883"
+      - "1884:1883"
     environment:
       - MQTT_USERNAME=${MQTT_USERNAME:-iobuild}
       - MQTT_PASSWORD=${MQTT_PASSWORD:?Set MQTT_PASSWORD in Dokploy}
