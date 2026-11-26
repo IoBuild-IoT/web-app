@@ -1,11 +1,11 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import DeviceControlPanel from './device-control-panel.vue';
+import ControlBoard from './control-board.vue';
+import HardwareLinkBanner from './hardware-link-banner.vue';
 import { useAnalyticsStore } from '../../../analytics/application/analytics.store.js';
 import { useDeviceStore } from '../../application/device.store.js';
 import { useIamStore } from '../../../iam/application/iam.store.js';
-import { isOnlineStatus } from '../../domain/model/device-status.enum.js';
 
 const { t } = useI18n();
 
@@ -37,27 +37,6 @@ function getControllableAttrs(deviceType) {
   return controllableAttributesByType.value[deviceType] ?? [];
 }
 
-const getStatusSeverity = (status) => {
-  const s = String(status ?? '').trim().toLowerCase();
-  if (s === 'online' || s === 'active') return 'success';
-  if (s === 'idle' || s === 'standby') return 'warn';
-  if (status) return 'danger';
-  return 'info'; // unknown / empty
-};
-
-const getStatusLabel = (status) => {
-  const s = String(status ?? '').trim().toLowerCase();
-  if (s === 'online' || s === 'active') return t('devices.status.online');
-  if (s === 'idle' || s === 'standby') return 'Standby';
-  if (status) return t('devices.status.offline');
-  return t('devices.telemetry.unknown');
-};
-
-const formatLastSeen = (lastSeen) => {
-  if (!lastSeen) return '—';
-  return new Date(lastSeen).toLocaleString();
-};
-
 onMounted(() => {
   deviceStore.loadDeviceTypes();
   // Ensure the owner-scoped payload is available even when the analytics dashboard
@@ -70,45 +49,18 @@ onMounted(() => {
 
 <template>
   <div class="section">
-    <h3 class="section-title">My Unit Devices</h3>
-    <pv-data-table
-      v-if="devices.length"
-      :value="devices"
-      class="unit-devices-table"
-      striped-rows
-      size="small"
-    >
-      <pv-column field="deviceName" header="Name" />
-      <pv-column header="Status">
-        <template #body="{ data }">
-          <pv-tag
-            :value="getStatusLabel(data.status)"
-            :severity="getStatusSeverity(data.status)"
-          />
-        </template>
-      </pv-column>
-      <pv-column header="Last Online">
-        <template #body="{ data }">
-          <span>{{ formatLastSeen(data.lastOnline) }}</span>
-        </template>
-      </pv-column>
-      <!-- Control column — visible only for Owner role -->
-      <pv-column v-if="isOwner" header="Control">
-        <template #body="{ data }">
-          <DeviceControlPanel
-            :device="data"
-            :controllable-attributes="getControllableAttrs(data.type)"
-          />
-          <span
-            v-if="getControllableAttrs(data.type).length === 0"
-            class="no-controls-label"
-          >
-            —
-          </span>
-        </template>
-      </pv-column>
-    </pv-data-table>
-    <p v-else class="no-data">No unit devices provisioned yet.</p>
+    <h3 class="section-title">{{ t('devices.board.sectionTitle') }}</h3>
+    <p class="section-hint">{{ t('devices.board.sectionHint') }}</p>
+    <HardwareLinkBanner :device-ids="devices.map((device) => device.deviceId ?? device.id)" />
+    <div v-if="devices.length" class="unit-devices-board">
+      <ControlBoard
+        v-for="device in devices"
+        :key="device.deviceId ?? device.id"
+        :device="device"
+        :attributes="getControllableAttrs(device.type)"
+      />
+    </div>
+    <p v-else class="no-data">{{ t('devices.board.empty') }}</p>
   </div>
 </template>
 
@@ -125,18 +77,33 @@ onMounted(() => {
   font-size: 1.25rem;
   font-weight: 700;
   color: #111827;
-  margin-bottom: 1.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.section-hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Devices with few components (light, climate) share a row; the edge node takes the full width.
+   Equal row heights keep the boards aligned. */
+.section { container-type: inline-size; }
+.unit-devices-board {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+@container (min-width: 44rem) {
+  .unit-devices-board { grid-template-columns: repeat(2, 1fr); }
+  .unit-devices-board > .device--full { grid-column: 1 / -1; }
 }
 
 .no-data {
   text-align: center;
   color: #9CA3AF;
   padding: 2rem;
-  font-size: 0.875rem;
-}
-
-.no-controls-label {
-  color: #9CA3AF;
   font-size: 0.875rem;
 }
 </style>
