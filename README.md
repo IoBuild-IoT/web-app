@@ -84,9 +84,9 @@ resume el contrato usado por el componente `web-app`.
 
 ### Broker MQTT
 
-- MQTT local: `mosquitto` acepta conexiones anónimas y escucha en `1883`.
+- MQTT local: `mosquitto` acepta conexiones anónimas y se publica en el puerto `1884` del host (dentro de Docker, 1883).
 - MQTT desplegado: configure `MQTT_PASSWORD` (usuario por defecto `iobuild`) en
-  Dokploy y abra `1883/TCP` en el VPS. Los contenedores usan estas credenciales.
+  Dokploy y abra `1884/TCP` en el VPS. Los contenedores usan estas credenciales.
 - El ESP32 debe configurar el host público del VPS, no `mosquitto`, porque
   `mosquitto` solo resuelve dentro de la red Docker.
 - En local, configure `HARDWARE_DEVICE_IDS` en `.env` con los IDs reales;
@@ -150,7 +150,7 @@ MySQL aunque InfluxDB quede fuera de servicio.
 Compruebe el flujo desde otra red con:
 
 ```bash
-mosquitto_sub -h <IP-o-dominio-del-VPS> -p 1883 \
+mosquitto_sub -h <IP-o-dominio-del-VPS> -p 1884 \
   -u iobuild -P <MQTT_PASSWORD> -t 'telemetry/#' -v
 ```
 
