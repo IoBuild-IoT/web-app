@@ -143,3 +143,46 @@ arduino-cli upload -p /dev/cu.usbserial-0001 --fqbn esp32:esp32:esp32 hardware/f
 4. Monitor serie a 115200: debe verse `[MQTT] conectado ...` y `PLATAFORMA: CONECTADO`.
 
 Validado el 2026-11-21 con la placa real: telemetría de los 3 dispositivos en el dashboard (humedad, presencia, persiana, alarma) y órdenes desde el front (`climateDelta`, luz On/Off) confirmadas por la placa.
+
+## Compilar el firmware con Docker (sin Arduino IDE)
+
+`hardware/firmware/Dockerfile` trae arduino-cli 1.6.0, el core esp32 4.0.0 y las cuatro
+librerías con las versiones validadas en la placa. Necesita `secrets.h` (no está en git).
+
+```bash
+docker compose -f hardware/firmware/docker-compose.yml run --rm firmware
+```
+
+Si la ruta de la carpeta contiene `:` (por ejemplo `P:` en una carpeta de Google Drive),
+Compose falla con `invalid volume specification`. Usa entonces `docker run`:
+
+```bash
+cd hardware/firmware && docker build -t iobuild-edge-node-firmware . && mkdir -p build
+```
+
+```bash
+docker run --rm --mount "type=bind,source=$PWD/iobuild_edge_node,target=/sketch,readonly" --mount "type=bind,source=$PWD/build,target=/out" iobuild-edge-node-firmware
+```
+
+Deja los binarios en `hardware/firmware/build/` (también en `.gitignore`). El archivo para
+flashear de una vez es `iobuild_edge_node.ino.merged.bin`; flashearlo **borra los ajustes
+guardados en la placa** (vuelven solos desde la plataforma al conectarse).
+
+La imagen pesa ~2.4 GB y solo compila para el ESP32 clásico: `trim_index.py` excluye el
+toolchain RISC-V, las librerías de otros chips y los depuradores. Para S2/S3/C3/C6, quita
+ese paso del `Dockerfile`.
+
+Flashear:
+
+- **macOS / Windows:** Docker Desktop no ve el USB. Flashea desde el host con `esptool`
+  (viene con el Arduino IDE o con `pip install esptool`):
+
+  ```bash
+  esptool --chip esp32 --port /dev/cu.usbserial-0001 write-flash 0x0 hardware/firmware/build/iobuild_edge_node.ino.merged.bin
+  ```
+
+- **Linux:** el contenedor puede subirlo directo:
+
+  ```bash
+  docker compose -f hardware/firmware/docker-compose.yml run --rm --device /dev/ttyUSB0 firmware flash /dev/ttyUSB0
+  ```
