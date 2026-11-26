@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { AnalyticsApi } from "../infrastructure/analytics-api.js";
 import { DeviceApi } from "@/devices/infrastructure/device-api.js";
+import { useHardwareLinkStore } from "@/devices/application/hardware-link.store.js";
 import { ProjectApi } from "@/projects/infrastructure/project-api.js";
 import { ANALYTICS_DEFAULT_MINUTES, POLLING_INTERVAL_MS } from "@/shared/infrastructure/constants.js";
 
@@ -53,7 +54,8 @@ export const useAnalyticsStore = defineStore("analytics", () => {
 
             builderDashboard.value = rawDashboard;
         } catch (error) {
-            errors.value.push(error);
+            // A failed background refresh keeps the last good dashboard on screen.
+            if (!silent) errors.value.push(error);
             console.error('Error fetching builder dashboard:', error);
         } finally {
             if (!silent) loading.value = false;
@@ -65,7 +67,7 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         try {
             ownerDashboard.value = await analyticsApi.getOwnerDashboard(ownerId);
         } catch (error) {
-            errors.value.push(error);
+            if (!silent) errors.value.push(error);
             console.error('Error fetching owner dashboard:', error);
         } finally {
             if (!silent) loading.value = false;
@@ -138,9 +140,13 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         }
     }
 
-    function startLiveEnergyPolling(userId, role, minutes = ANALYTICS_DEFAULT_MINUTES) {
+    function startLiveEnergyPolling(userId, role, minutes = ANALYTICS_DEFAULT_MINUTES, intervalMs = POLLING_INTERVAL_MS) {
+        stopLiveEnergyPolling();
         fetchLiveEnergy(userId, role, minutes);
-        _liveEnergyInterval = setInterval(() => fetchLiveEnergy(userId, role, minutes), POLLING_INTERVAL_MS);
+        // Owners poll only while their hardware is connected.
+        _liveEnergyInterval = setInterval(() => {
+            if (role !== 'owner' || useHardwareLinkStore().connected) fetchLiveEnergy(userId, role, minutes);
+        }, intervalMs);
     }
 
     function stopLiveEnergyPolling() {
