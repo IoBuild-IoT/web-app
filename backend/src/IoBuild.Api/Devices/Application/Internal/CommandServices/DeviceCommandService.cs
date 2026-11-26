@@ -99,9 +99,22 @@ public sealed class DeviceCommandService(IoBuildDbContext db, IDeviceMqttPublish
         {
             "AirConditioner" => attribute is "power" or "mode" or "targetTemperature",
             "SmartLight" => attribute is "power" or "brightness",
+            "EdgeNode" => EdgeNodeSettings.IsBoolean(attribute) || EdgeNodeSettings.Find(attribute) is not null,
             _ => false
         };
         if (!valid) throw new ArgumentException($"Attribute '{attribute}' is not valid for device type '{type}'.");
+        if (type == "EdgeNode")
+        {
+            if (EdgeNodeSettings.IsBoolean(attribute))
+            {
+                if (value.ValueKind is not JsonValueKind.True and not JsonValueKind.False) throw new ArgumentException($"{attribute} must be a boolean.");
+                return;
+            }
+            var setting = EdgeNodeSettings.Find(attribute)!;
+            if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || number < setting.Min || number > setting.Max)
+                throw new ArgumentException($"{setting.Name} must be a number from {setting.Min.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {setting.Max.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+            return;
+        }
         if (attribute == "brightness" && (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var brightness) || brightness < 0 || brightness > 100)) throw new ArgumentException("brightness must be a number from 0 to 100.");
         if (attribute == "targetTemperature" && (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var temperature) || temperature < 16 || temperature > 30)) throw new ArgumentException("targetTemperature must be a number from 16 to 30.");
         if (attribute == "power" && value.ValueKind is not JsonValueKind.True and not JsonValueKind.False) throw new ArgumentException("power must be a boolean.");
