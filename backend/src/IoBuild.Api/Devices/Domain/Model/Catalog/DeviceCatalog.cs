@@ -9,9 +9,34 @@ public static class DeviceCatalog
         ["WaterSensor"] = new("WaterSensor", "Water Sensor", "floor"),
         ["SmokeDetector"] = new("SmokeDetector", "Smoke Detector", "floor"),
         ["AirConditioner"] = new("AirConditioner", "Air Conditioner", "unit"),
-        ["SmartLight"] = new("SmartLight", "Smart Light", "unit")
+        ["SmartLight"] = new("SmartLight", "Smart Light", "unit"),
+        ["EdgeNode"] = new("EdgeNode", "Edge Node (ESP32)", "unit")
     };
     public static DeviceCatalogEntry? Find(string code) => Entries.GetValueOrDefault(code);
+}
+
+/// <summary>A numeric threshold the ESP32 edge node accepts in commands/{id}. Defaults mirror the firmware.</summary>
+public sealed record NumericSetting(string Name, double Min, double Max, double Step, double Default, string Unit);
+
+public static class EdgeNodeSettings
+{
+    public static readonly IReadOnlyList<NumericSetting> Numeric =
+    [
+        new("lightHoldSeconds", 5, 600, 5, 10, "s"),   // light stays on after last motion
+        new("climateDelta", 0.5, 5, 0.5, 1.5, "C"),    // climate turns on at ambient + delta
+        new("alarmDelta", 1, 10, 0.5, 3, "C"),         // buzzer at ambient + delta
+        new("blindStep", 0.5, 5, 0.5, 1, "C"),         // blind opens/closes per this change
+        new("blindAngle", 0, 180, 5, 0, "deg"),        // servo target while blindAuto is false
+    ];
+    /// <summary>On/off settings and their firmware defaults.</summary>
+    public static readonly IReadOnlyList<(string Name, bool Default)> Booleans =
+    [
+        ("alarmEnabled", true),   // buzzer + fast LED on over-temperature
+        ("motionEnabled", true),  // PIR sensor drives the hallway light
+        ("blindAuto", true),      // true: blind follows temperature; false: servo goes to blindAngle
+    ];
+    public static NumericSetting? Find(string name) => Numeric.FirstOrDefault(setting => setting.Name == name);
+    public static bool IsBoolean(string name) => Booleans.Any(setting => setting.Name == name);
 }
 
 internal static class DeviceStateLocks
