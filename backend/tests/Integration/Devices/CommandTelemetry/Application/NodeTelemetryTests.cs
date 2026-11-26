@@ -31,6 +31,18 @@ public sealed class NodeTelemetryTests
 
     [Fact]
     [Trait("Category", "IoT")]
+    public void Real_relay_states_travel_with_the_node_block_to_influx()
+    {
+        using var json = JsonDocument.Parse("{\"node\":{\"light\":true,\"climate\":false,\"alarm\":false}}");
+        var node = MqttDeviceTransport.ParseNode(json.RootElement);
+        Assert.Equal(new NodeSample(Alarm: false, Light: true, Climate: false), node);
+
+        var line = InfluxHttpTelemetrySink.BuildLine(new TelemetryMessage(8, "e1", At, "online", "{}", 0.5, 25, 220, node));
+        Assert.Contains("alarm=false,light=true,climate=false", line);
+    }
+
+    [Fact]
+    [Trait("Category", "IoT")]
     public void Influx_line_is_unchanged_without_node_data()
     {
         var line = InfluxHttpTelemetrySink.BuildLine(new TelemetryMessage(8, "e1", At, "online", "{}", 0.5, 25, 220));
@@ -133,6 +145,27 @@ public sealed class NodeTelemetryTests
 
         using var none = JsonDocument.Parse("{\"status\":\"online\"}");
         Assert.Null(MqttDeviceTransport.ParseNode(none.RootElement));
+    }
+
+    [Fact]
+    [Trait("Category", "IoT")]
+    public void Esp32_payload_tolerates_decimal_blind_and_unsynced_clock()
+    {
+        var now = DateTimeOffset.Parse("2026-11-21T20:00:00Z");
+        var esp32 = MqttDeviceTransport.ParseTelemetry(8, "{\"deviceId\":8,\"eventId\":\"esp32-8-1-27\",\"timestamp\":\"2026-11-21T18:38:55.079Z\",\"status\":\"online\",\"reported\":{\"power\":true},\"energy_kwh\":0.0017,\"temperature_c\":25.0,\"voltage_v\":220,\"node\":{\"humidity\":55,\"presence\":false,\"blind_deg\":179.6,\"alarm\":false}}", now);
+        Assert.Equal(DateTimeOffset.Parse("2026-11-21T18:38:55.079Z"), esp32.OccurredAt);
+        Assert.Equal("esp32-8-1-27", esp32.EventId);
+        Assert.Equal("{\"power\":true}", esp32.ReportedJson);
+        Assert.Equal(new NodeSample(55, false, 180, false), esp32.Node);
+
+        // ESP32 without NTP reports 1970 → server time; missing eventId → derived from it.
+        var noClock = MqttDeviceTransport.ParseTelemetry(8, "{\"timestamp\":\"1970-01-01T00:00:12Z\",\"energy_kwh\":\"bad\"}", now);
+        Assert.Equal(now, noClock.OccurredAt);
+        Assert.Equal($"8:{now:O}", noClock.EventId);
+        Assert.Equal(0, noClock.EnergyKwh);
+        Assert.Equal("unknown", noClock.Status);
+
+        Assert.ThrowsAny<JsonException>(() => MqttDeviceTransport.ParseTelemetry(8, "not json", now));
     }
 
     private static IoBuildDbContext Db() => new(new DbContextOptionsBuilder<IoBuildDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
