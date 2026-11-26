@@ -17,6 +17,8 @@ public sealed class InfluxHttpTelemetrySink(HttpClient client, Microsoft.Extensi
             if (node.Presence is { } presence) fields += $",presence={(presence ? "true" : "false")}";
             if (node.BlindDeg is { } blind) fields += $",blind_deg={blind.ToString(inv)}i";
             if (node.Alarm is { } alarm) fields += $",alarm={(alarm ? "true" : "false")}";
+            if (node.Light is { } light) fields += $",light={(light ? "true" : "false")}";
+            if (node.Climate is { } climate) fields += $",climate={(climate ? "true" : "false")}";
         }
         return $"telemetry,deviceId={message.DeviceId} {fields} {message.OccurredAt.ToUnixTimeMilliseconds() * 1_000_000}";
     }
