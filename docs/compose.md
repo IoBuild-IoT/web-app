@@ -6,7 +6,7 @@ Final monolith topology is one backend + one frontend + one MySQL. No YARP, no R
 
 | Service | Container | Purpose | Required |
 |---|---|---|---|
-| `iobuild-api-iot` | `iobuild-api` | ASP.NET Core 9 monolith (8080) | yes |
+| `iobuild-api` | `iobuild-api-iot` | ASP.NET Core 9 monolith (8080) | yes |
 | `mysql-monolith` | `iobuild-mysql-monolith-iot` | MySQL 8 (single DB `iobuild`) | yes |
 | `frontend` | `iobuild-frontend-iot` | Vue SPA (built via `frontend/Dockerfile`) | yes |
 | `nginx` | `iobuild-nginx-iot` | Edge proxy — `/api/` → `iobuild-api:8080`, SPA fallback | yes |
