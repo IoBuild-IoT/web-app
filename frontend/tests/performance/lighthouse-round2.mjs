@@ -61,7 +61,7 @@ if ((phase === 'before' && !process.argv.includes('--resume')) || process.argv.i
     ['Builder', 'profile-builder', '/profiles/profile', '.profile-name', 'Perf Builder'],
     ['Owner', 'profile-owner', '/profiles/profile', '.profile-name', 'Perf Owner'],
     ['Builder', 'devices-builder', '/devices/device-management', '.device-management-view .p-datatable', 'Perf Hall Light'],
-    ['Owner', 'devices-owner', '/devices/device-management', '.unit-devices-table', 'Perf Hall Light'],
+    ['Owner', 'devices-owner', '/devices/device-management', '.unit-devices-board', 'Perf Hall Light'],
     ['Builder', 'my-subscription', '/subscriptions/my-subscription', '.hero-plan-title', plans[0].name],
   ];
   writeFileSync(join(root, 'catalog.json'), JSON.stringify(catalog, null, 2));
