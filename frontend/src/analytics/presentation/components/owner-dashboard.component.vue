@@ -6,10 +6,15 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import StatCard from './stat-card.component.vue';
 import UnitCard from './unit-card.component.vue';
 import LiveEnergyChart from './live-energy-chart.component.vue';
+import NodeReadings from '../../../devices/presentation/components/node-readings.vue';
+import LivePanel from './live-panel.component.vue';
+import HardwareLinkBanner from '../../../devices/presentation/components/hardware-link-banner.vue';
+import { useHardwareLinkStore } from '../../../devices/application/hardware-link.store.js';
+import { isDeviceUp, summarizeLive } from '../../application/live-summary.js';
+import { useAutoRefresh } from '../../../shared/application/auto-refresh.js';
 import { useAnalyticsStore } from '../../application/analytics.store.js';
 import { useIamStore } from '../../../iam/application/iam.store.js';
-import { ANALYTICS_DEFAULT_MINUTES } from '../../../shared/infrastructure/constants.js';
-import { isOnlineStatus } from '../../../devices/domain/model/device-status.enum.js';
+import { ANALYTICS_DEFAULT_MINUTES, DASHBOARD_REFRESH_MS } from '../../../shared/infrastructure/constants.js';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
@@ -57,29 +62,50 @@ const energyChartData = computed(() => {
   analyticsStore.deviceEnergyReadings.forEach(r => {
     const ts = new Date(r.timestamp).getTime();
     const bucket = Math.floor(ts / bucketMs) * bucketMs;
-    const existing = bucketMap.get(bucket) || { sum: 0, count: 0 };
+    const existing = bucketMap.get(bucket) || { sum: 0, count: 0, tempSum: 0, tempCount: 0 };
     existing.sum += r.energyKwh;
     existing.count++;
+    if (r.temperatureC > 0) { existing.tempSum += r.temperatureC; existing.tempCount++; }
     bucketMap.set(bucket, existing);
   });
 
   const sortedBuckets = [...bucketMap.keys()].sort();
+  const hasTemperature = sortedBuckets.some(b => bucketMap.get(b).tempCount > 0);
+
+  const datasets = [{
+    label: t('devices.telemetry.energyChart'),
+    data: sortedBuckets.map(b => {
+      const { sum, count } = bucketMap.get(b);
+      return count > 0 ? parseFloat((sum / count).toFixed(2)) : 0;
+    }),
+    borderColor: '#8B5CF6',
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    fill: true,
+    tension: 0.4,
+    yAxisID: 'y'
+  }];
+  // Real temperature measured by the device, on its own axis.
+  if (hasTemperature) {
+    datasets.push({
+      label: `${t('devices.telemetry.temperature')} (°C)`,
+      data: sortedBuckets.map(b => {
+        const { tempSum, tempCount } = bucketMap.get(b);
+        return tempCount > 0 ? parseFloat((tempSum / tempCount).toFixed(1)) : null;
+      }),
+      borderColor: '#F59E0B',
+      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+      fill: false,
+      tension: 0.4,
+      spanGaps: true,
+      yAxisID: 'y1'
+    });
+  }
 
   return {
     labels: sortedBuckets.map(b =>
       new Date(b).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     ),
-    datasets: [{
-      label: t('devices.telemetry.energyChart'),
-      data: sortedBuckets.map(b => {
-        const { sum, count } = bucketMap.get(b);
-        return count > 0 ? parseFloat((sum / count).toFixed(2)) : 0;
-      }),
-      borderColor: '#8B5CF6',
-      backgroundColor: 'rgba(139, 92, 246, 0.1)',
-      fill: true,
-      tension: 0.4
-    }]
+    datasets
   };
 });
 
@@ -99,6 +125,12 @@ const telemetryChartOptions = {
         display: true,
         text: 'kWh'
       }
+    },
+    y1: {
+      display: 'auto',
+      position: 'right',
+      grid: { drawOnChartArea: false },
+      title: { display: true, text: '°C' }
     }
   }
 };
@@ -157,6 +189,24 @@ const fetchTelemetry = async (deviceId) => {
 watch(() => analyticsStore.selectedDeviceId, async (newId) => {
   await fetchTelemetry(newId);
 });
+
+// ---- Live data: real readings of every owner device, refreshed every few seconds --------
+const refreshSeconds = DASHBOARD_REFRESH_MS / 1000;
+const link = useHardwareLinkStore();
+const nowTick = computed(() => link.checkedAt);
+const deviceIds = computed(() => (props.dashboard?.deviceHealthStatus ?? []).map((d) => d.deviceId));
+const liveSummary = computed(() => summarizeLive(props.dashboard?.deviceHealthStatus ?? [], link.readings));
+const isConnected = (id) => isDeviceUp(link.readings[id]);
+
+// The banner owns the live-status polling; here only the selected device's chart follows it.
+useAutoRefresh(
+  () => (link.connected && analyticsStore.selectedDeviceId ? fetchTelemetry(analyticsStore.selectedDeviceId) : null),
+  DASHBOARD_REFRESH_MS,
+);
+
+// Cards that used placeholders now use the real readings once they have arrived.
+const onlineNow = computed(() => (liveSummary.value.ready ? liveSummary.value.online : props.dashboard.onlineDevices));
+const alertsNow = computed(() => (liveSummary.value.ready ? liveSummary.value.alerts : props.dashboard.alertsCount));
 
 watch(timeRange, () => {
   if (analyticsStore.selectedDeviceId) {
@@ -261,6 +311,10 @@ const chartOptions = {
       <p class="dashboard-subtitle">{{ $t('analytics.owner.subtitle') }}</p>
     </div>
     
+    <!-- Live status: real readings of the owner's devices, refreshed automatically -->
+    <HardwareLinkBanner :device-ids="deviceIds" />
+    <LivePanel :summary="liveSummary" :seconds="refreshSeconds" :now="nowTick" />
+
     <!-- Hero Stats -->
     <div class="stats-grid">
       <StatCard
@@ -276,7 +330,7 @@ const chartOptions = {
         icon="pi-box"
         icon-bg-color="bg-blue-100"
         icon-text-color="text-blue-600"
-        :subtitle="`${dashboard.onlineDevices} ${$t('analytics.owner.stats.online')}`"
+        :subtitle="`${onlineNow} ${$t('analytics.owner.stats.online')}`"
       />
       <StatCard
         v-if="dashboard.energyThisMonth > 0"
@@ -296,7 +350,7 @@ const chartOptions = {
       />
       <StatCard
         :title="$t('analytics.owner.stats.alerts')"
-        :value="dashboard.alertsCount"
+        :value="alertsNow"
         icon="pi-bell"
         icon-bg-color="bg-red-100"
         icon-text-color="text-red-600"
@@ -321,7 +375,8 @@ const chartOptions = {
         </div>
       </div>
       
-      <div class="chart-container">
+      <!-- No water sensor in the prototype: hide the card instead of showing an empty chart -->
+      <div v-if="waterUsageChartData" class="chart-container">
         <h3 class="chart-title">{{ $t('analytics.owner.charts.waterUsage') }}</h3>
         <div class="chart-wrapper">
           <Bar v-if="waterUsageChartData" :data="waterUsageChartData" :options="chartOptions" />
@@ -333,7 +388,7 @@ const chartOptions = {
     <!-- Live Energy Chart -->
     <div class="chart-container live-energy-section">
       <h3 class="chart-title">Live Energy — Last {{ liveMinutes }} min</h3>
-      <p class="chart-subtitle">Auto-refreshes every 30s</p>
+      <p class="chart-subtitle">Auto-refreshes every {{ refreshSeconds }}s</p>
       <div class="chart-wrapper">
         <LiveEnergyChart :user-id="userId" role="owner" :minutes="liveMinutes" />
       </div>
@@ -380,8 +435,8 @@ const chartOptions = {
             <div class="status-field">
               <span class="status-label">{{ $t('devices.telemetry.status') }}</span>
               <pv-tag
-                :value="getStatusLabel(analyticsStore.deviceStatus.status)"
-                :severity="getStatusSeverity(analyticsStore.deviceStatus.status)"
+                :value="getStatusLabel(isConnected(analyticsStore.selectedDeviceId) ? analyticsStore.deviceStatus.status : 'offline')"
+                :severity="getStatusSeverity(isConnected(analyticsStore.selectedDeviceId) ? analyticsStore.deviceStatus.status : 'offline')"
               />
             </div>
             <div class="status-field">
@@ -415,6 +470,7 @@ const chartOptions = {
               <span class="status-label">{{ $t('devices.telemetry.voltage') }}</span>
               <span class="status-value">{{ analyticsStore.deviceStatus.voltageV != null ? `${analyticsStore.deviceStatus.voltageV.toFixed(1)} V` : '—' }}</span>
             </div>
+            <NodeReadings :node="isConnected(analyticsStore.selectedDeviceId) ? analyticsStore.deviceStatus.node : null" />
           </div>
           <div v-else-if="analyticsStore.telemetryLoading" class="no-data">
             {{ $t('devices.telemetry.loading') }}
@@ -445,9 +501,9 @@ const chartOptions = {
             </div>
             <span
               class="device-status"
-              :class="isOnlineStatus(device.status) ? 'status-online' : 'status-offline'"
+              :class="isConnected(device.deviceId) ? 'status-online' : 'status-offline'"
             >
-              {{ isOnlineStatus(device.status) ? $t('analytics.owner.device.online') : $t('analytics.owner.device.offline') }}
+              {{ isConnected(device.deviceId) ? $t('analytics.owner.device.online') : $t('analytics.owner.device.offline') }}
             </span>
           </div>
           <div class="device-health-body">
