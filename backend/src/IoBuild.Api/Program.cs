@@ -108,7 +108,7 @@ builder.Services.AddSingleton<IDeviceMqttPublisher>(services => services.GetRequ
 builder.Services.AddHostedService(services => services.GetRequiredService<MqttDeviceTransport>());
 builder.Services.AddHttpClient<IInfluxTelemetrySink, InfluxHttpTelemetrySink>(c => c.Timeout = TimeSpan.FromMilliseconds(500));
 builder.Services.AddHttpClient<ILiveEnergyService, LiveEnergyService>(c => c.Timeout = TimeSpan.FromMilliseconds(500));
-builder.Services.AddHttpClient<ILiveDeviceStatusService, LiveDeviceStatusService>(c => c.Timeout = TimeSpan.FromMilliseconds(500));
+builder.Services.AddHttpClient<ILiveDeviceStatusService, LiveDeviceStatusService>(c => c.Timeout = TimeSpan.FromMilliseconds(1500));
 builder.Services.AddScoped<IAnalyticsQueryService, AnalyticsQueryService>();
 builder.Services.AddScoped<AnalyticsProjectionImporter>();
 builder.Services.AddScoped<DeviceCommandService>();
