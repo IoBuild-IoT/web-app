@@ -56,3 +56,4 @@ shipping.js
 # Firmware ESP32: credenciales locales
 hardware/firmware/**/secrets.h
 hardware/demo-local.md
+hardware/firmware/build/
