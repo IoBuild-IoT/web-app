@@ -14,7 +14,7 @@ Cambios de este repositorio que lo hacen posible:
 1. Cree los dispositivos reales desde la aplicación y anote el ID asignado a cada uno.
 2. Configure `HARDWARE_DEVICE_IDS` con esos IDs, por ejemplo `HARDWARE_DEVICE_IDS=7,8`.
 3. Use un nombre de host o IP pública del VPS como `MQTT_HOST` en el firmware.
-4. En producción, configure `MQTT_PASSWORD` en Dokploy y abra el puerto `1883/TCP`.
+4. En producción, configure `MQTT_PASSWORD` en Dokploy y abra el puerto `1884/TCP`.
 5. Use credenciales MQTT diferentes a las credenciales de usuario de IoBuild.
 
 ## Contrato mínimo
