@@ -562,7 +562,141 @@
       "voltage": "Voltaje",
       "noData": "No hay datos de telemetría disponibles",
       "loading": "Cargando telemetría...",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "humidity": "Humedad",
+      "presence": "Presencia",
+      "detected": "Detectada",
+      "notDetected": "Sin movimiento",
+      "blind": "Persiana",
+      "alarm": "Alarma",
+      "alarmOn": "Activa",
+      "alarmOff": "Normal"
+    },
+    "link": {
+      "connected": "ESP32 conectado",
+      "checking": "Buscando el ESP32…",
+      "disconnected": "ESP32 desconectado",
+      "paused": "La actualización en vivo está en pausa.",
+      "failed": "El ESP32 no respondió. Revisa que esté encendido y con WiFi.",
+      "connect": "Conectar con ESP32",
+      "lastSignal": "Última señal"
+    },
+    "board": {
+      "sectionTitle": "Panel de control",
+      "sectionHint": "Enciende o apaga cada componente y ajusta cómo se comporta. Los cambios se aplican al soltar el control.",
+      "empty": "Todavía no hay dispositivos en tu unidad.",
+      "status": {
+        "online": "En línea",
+        "standby": "En espera",
+        "offline": "Sin conexión",
+        "unknown": "Sin datos"
+      },
+      "lastReading": "Última lectura",
+      "seen": {
+        "s": "hace {n} s",
+        "m": "hace {n} min",
+        "h": "hace {n} h",
+        "d": "hace {n} d"
+      },
+      "switchOn": "Encendido",
+      "switchOff": "Apagado",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "lockedHint": "Enciéndelo para ajustar",
+      "applyHint": "Suelta para aplicar",
+      "sent": "Cambio enviado",
+      "failed": "No se pudo enviar el cambio",
+      "live": {
+        "lightOn": "Encendida ahora",
+        "lightOff": "Apagada ahora",
+        "climateOn": "Funcionando ahora",
+        "climateOff": "En reposo ahora",
+        "presenceOn": "Movimiento detectado",
+        "presenceOff": "Sin movimiento",
+        "alarmOn": "ALARMA ACTIVA",
+        "alarmOff": "Todo normal",
+        "blindPosition": "Posición: {angle}° ({percent} % abierta)",
+        "ledOk": "Fijo: todo en orden",
+        "ledAlarm": "Parpadeo rápido: alarma",
+        "ledOffline": "Parpadeo lento: sin conexión"
+      },
+      "cards": {
+        "light": {
+          "title": "Luz del pasillo",
+          "hint": "LED amarillo · se enciende al detectar movimiento",
+          "hardwareNote": "LED por relé: solo enciende y apaga, no tiene brillo."
+        },
+        "climate": {
+          "title": "Clima",
+          "hint": "LED azul · frío, calor o ventilador",
+          "hardwareNote": "Salida por relé: el modo se aplica; este nodo no usa la temperatura objetivo."
+        },
+        "motion": {
+          "title": "Sensor de movimiento",
+          "hint": "PIR · decide cuándo se enciende la luz del pasillo",
+          "offNote": "Con el sensor apagado la luz no se enciende por movimiento."
+        },
+        "blind": {
+          "title": "Persiana",
+          "hint": "Servomotor · 0° cerrada, 180° abierta"
+        },
+        "alarm": {
+          "title": "Alarma",
+          "hint": "Buzzer + parpadeo rápido cuando hace demasiado calor"
+        },
+        "thermostat": {
+          "title": "Clima automático",
+          "hint": "Cuándo se enciende el clima por sí solo"
+        },
+        "statusLed": {
+          "title": "LED de estado",
+          "hint": "LED verde · muestra la salud del nodo (solo lectura)"
+        },
+        "other": {
+          "title": "Otros ajustes",
+          "hint": ""
+        },
+        "readings": {
+          "title": "Lecturas en vivo",
+          "hint": "Lo que mide el nodo ahora mismo"
+        }
+      },
+      "attributes": {
+        "power": "Encendido",
+        "brightness": "Brillo",
+        "mode": "Modo",
+        "targetTemperature": "Temperatura objetivo",
+        "lightHoldSeconds": "Sigue encendida tras el último movimiento",
+        "climateDelta": "Encender cuando supera al ambiente por",
+        "alarmDelta": "Sonar cuando supera al ambiente por",
+        "blindStep": "Mover la persiana cada",
+        "blindAngle": "Ángulo de la persiana",
+        "alarmEnabled": "Alarma",
+        "motionEnabled": "Sensor",
+        "blindAuto": "Control automático"
+      },
+      "modes": {
+        "cooling": "Frío",
+        "heating": "Calor",
+        "fan": "Ventilador"
+      },
+      "blind": {
+        "auto": "Automática",
+        "manual": "Manual",
+        "autoHint": "Se abre cuando la temperatura sube {step} °C y se cierra cuando baja {step} °C.",
+        "manualHint": "Elige la posición. La persiana se mueve hasta ese ángulo.",
+        "close": "Cerrar",
+        "half": "Mitad",
+        "open": "Abrir",
+        "closedEnd": "Cerrada",
+        "openEnd": "Abierta",
+        "target": "Ángulo"
+      },
+      "readings": {
+        "temperature": "Temperatura",
+        "humidity": "Humedad",
+        "none": "Sin lectura"
+      }
     },
     "types": {
       "temperature": "Sensor de Temperatura",
@@ -772,6 +906,32 @@
       }
     },
     "owner": {
+      "live": {
+        "title": "Estado en vivo del prototipo",
+        "subtitle": "Lecturas reales de tus dispositivos · se actualiza cada {seconds} s",
+        "liveBadge": "En vivo",
+        "pausedBadge": "En pausa",
+        "tiles": {
+          "online": "Dispositivos en línea",
+          "temperature": "Temperatura",
+          "humidity": "Humedad",
+          "presence": "Presencia",
+          "light": "Luz del pasillo",
+          "climate": "Clima",
+          "blind": "Persiana",
+          "alarm": "Alarma"
+        },
+        "values": {
+          "detected": "Movimiento",
+          "noMotion": "Sin movimiento",
+          "lit": "Encendida",
+          "off": "Apagada",
+          "running": "Funcionando",
+          "idle": "En reposo",
+          "alarm": "ALARMA",
+          "normal": "Normal"
+        }
+      },
       "title": "Mi Panel de Unidad",
       "subtitle": "Vista general personal de tu hogar inteligente",
       "stats": {
