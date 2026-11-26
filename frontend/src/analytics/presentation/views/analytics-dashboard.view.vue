@@ -4,10 +4,13 @@ import { useAnalyticsStore } from '../../application/analytics.store.js';
 import { useIamStore } from '../../../iam/application/iam.store.js';
 import BuilderDashboard from '../components/builder-dashboard.component.vue';
 import OwnerDashboard from '../components/owner-dashboard.component.vue';
-import { RETRY_DELAY_SHORT_MS, RETRY_DELAY_LONG_MS, RETRY_OWNER_DASHBOARD_MAX_ATTEMPTS } from '../../../shared/infrastructure/constants.js';
+import { RETRY_DELAY_SHORT_MS, RETRY_DELAY_LONG_MS, RETRY_OWNER_DASHBOARD_MAX_ATTEMPTS, DASHBOARD_REFRESH_MS } from '../../../shared/infrastructure/constants.js';
+import { useHardwareLinkStore } from '../../../devices/application/hardware-link.store.js';
+import { useAutoRefresh } from '../../../shared/application/auto-refresh.js';
 
 const analyticsStore = useAnalyticsStore();
 const iamStore = useIamStore();
+const hardwareLink = useHardwareLinkStore();
 
 const currentUser = computed(() => iamStore.currentUser);
 const userRole = computed(() => currentUser.value?.role?.toLowerCase() || 'owner');
@@ -52,6 +55,14 @@ async function loadDashboard() {
     }
   }
 }
+
+// Keep cards and charts current without reloading: silent re-fetch every few seconds.
+// Silent means no spinner and no error screen if one refresh fails.
+useAutoRefresh(async () => {
+  if (!userId.value || analyticsStore.loading) return;
+  if (userRole.value === 'builder') await analyticsStore.fetchBuilderDashboard(userId.value, true);
+  else if (userRole.value === 'owner' && hardwareLink.connected) await analyticsStore.fetchOwnerDashboard(userId.value, true);
+}, DASHBOARD_REFRESH_MS);
 
 // onMounted fires on every fresh navigation (component is not keep-alive here).
 onMounted(loadDashboard);
