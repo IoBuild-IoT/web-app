@@ -583,7 +583,141 @@
       "loading": "Loading telemetry...",
       "unknown": "Unknown",
       "lastHour": "Last Hour",
-      "last24h": "Last 24h"
+      "last24h": "Last 24h",
+      "humidity": "Humidity",
+      "presence": "Presence",
+      "detected": "Detected",
+      "notDetected": "No motion",
+      "blind": "Blind",
+      "alarm": "Alarm",
+      "alarmOn": "Active",
+      "alarmOff": "Normal"
+    },
+    "link": {
+      "connected": "ESP32 connected",
+      "checking": "Looking for the ESP32…",
+      "disconnected": "ESP32 disconnected",
+      "paused": "Live updates are paused.",
+      "failed": "The ESP32 did not answer. Check that it is powered and on WiFi.",
+      "connect": "Connect to ESP32",
+      "lastSignal": "Last signal"
+    },
+    "board": {
+      "sectionTitle": "Control panel",
+      "sectionHint": "Turn each component on or off and tune how it behaves. Changes apply as soon as you release the control.",
+      "empty": "There are no devices in your unit yet.",
+      "status": {
+        "online": "Online",
+        "standby": "Standby",
+        "offline": "Offline",
+        "unknown": "No data"
+      },
+      "lastReading": "Last reading",
+      "seen": {
+        "s": "{n} s ago",
+        "m": "{n} min ago",
+        "h": "{n} h ago",
+        "d": "{n} d ago"
+      },
+      "switchOn": "On",
+      "switchOff": "Off",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "lockedHint": "Turn it on to adjust",
+      "applyHint": "Release to apply",
+      "sent": "Change sent",
+      "failed": "Could not send the change",
+      "live": {
+        "lightOn": "Lit now",
+        "lightOff": "Off now",
+        "climateOn": "Running now",
+        "climateOff": "Idle now",
+        "presenceOn": "Motion detected",
+        "presenceOff": "No motion",
+        "alarmOn": "ALARM ACTIVE",
+        "alarmOff": "All normal",
+        "blindPosition": "Position: {angle}° ({percent} % open)",
+        "ledOk": "Solid: all good",
+        "ledAlarm": "Fast blink: alarm",
+        "ledOffline": "Slow blink: no connection"
+      },
+      "cards": {
+        "light": {
+          "title": "Hallway light",
+          "hint": "Yellow LED · turns on when motion is detected",
+          "hardwareNote": "Relay-driven LED: it only switches on and off, so it has no brightness."
+        },
+        "climate": {
+          "title": "Climate",
+          "hint": "Blue LED · cooling, heating or fan",
+          "hardwareNote": "Relay output: the mode applies; this node does not use a target temperature."
+        },
+        "motion": {
+          "title": "Motion sensor",
+          "hint": "PIR · decides when the hallway light turns on",
+          "offNote": "With the sensor off, the light will not turn on by motion."
+        },
+        "blind": {
+          "title": "Blind",
+          "hint": "Servo motor · 0° closed, 180° open"
+        },
+        "alarm": {
+          "title": "Alarm",
+          "hint": "Buzzer + fast blink when it gets too hot"
+        },
+        "thermostat": {
+          "title": "Automatic climate",
+          "hint": "When the climate turns on by itself"
+        },
+        "statusLed": {
+          "title": "Status LED",
+          "hint": "Green LED · shows the node's health (read-only)"
+        },
+        "other": {
+          "title": "Other settings",
+          "hint": ""
+        },
+        "readings": {
+          "title": "Live readings",
+          "hint": "What the node measures right now"
+        }
+      },
+      "attributes": {
+        "power": "Power",
+        "brightness": "Brightness",
+        "mode": "Mode",
+        "targetTemperature": "Target temperature",
+        "lightHoldSeconds": "Stay on after the last motion",
+        "climateDelta": "Turn on when hotter than the room by",
+        "alarmDelta": "Sound when hotter than the room by",
+        "blindStep": "Move the blind every",
+        "blindAngle": "Blind angle",
+        "alarmEnabled": "Alarm",
+        "motionEnabled": "Sensor",
+        "blindAuto": "Automatic control"
+      },
+      "modes": {
+        "cooling": "Cooling",
+        "heating": "Heating",
+        "fan": "Fan"
+      },
+      "blind": {
+        "auto": "Automatic",
+        "manual": "Manual",
+        "autoHint": "Opens when the temperature rises {step} °C and closes when it drops {step} °C.",
+        "manualHint": "Pick a position. The blind moves to that angle.",
+        "close": "Close",
+        "half": "Half",
+        "open": "Open",
+        "closedEnd": "Closed",
+        "openEnd": "Open",
+        "target": "Angle"
+      },
+      "readings": {
+        "temperature": "Temperature",
+        "humidity": "Humidity",
+        "none": "No reading"
+      }
     },
     "types": {
       "temperature": "Temperature Sensor",
@@ -774,6 +908,32 @@
       }
     },
     "owner": {
+      "live": {
+        "title": "Live prototype status",
+        "subtitle": "Real readings from your devices · updates every {seconds} s",
+        "liveBadge": "Live",
+        "pausedBadge": "Paused",
+        "tiles": {
+          "online": "Devices online",
+          "temperature": "Temperature",
+          "humidity": "Humidity",
+          "presence": "Presence",
+          "light": "Hallway light",
+          "climate": "Climate",
+          "blind": "Blind",
+          "alarm": "Alarm"
+        },
+        "values": {
+          "detected": "Motion",
+          "noMotion": "No motion",
+          "lit": "On",
+          "off": "Off",
+          "running": "Running",
+          "idle": "Idle",
+          "alarm": "ALARM",
+          "normal": "Normal"
+        }
+      },
       "title": "My Unit Dashboard",
       "subtitle": "Personal overview of your smart home",
       "stats": {
