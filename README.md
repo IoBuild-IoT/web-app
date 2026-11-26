@@ -75,6 +75,90 @@ docker build -f backend/Dockerfile -t iobuild-api:local ./backend
 docker build -t iobuild-frontend:local ./frontend
 ```
 
+## ESP32 hardware node
+
+Un nodo ESP32 real puede publicar sensores y recibir órdenes de la plataforma
+sin cambiar el backend ni el frontend. El firmware vive en el repositorio
+[IoBuild-IoT/edge-node](https://github.com/IoBuild-IoT/edge-node); esta sección
+resume el contrato usado por el componente `web-app`.
+
+### Broker MQTT
+
+- MQTT local: `mosquitto` acepta conexiones anónimas y escucha en `1883`.
+- MQTT desplegado: configure `MQTT_PASSWORD` (usuario por defecto `iobuild`) en
+  Dokploy y abra `1883/TCP` en el VPS. Los contenedores usan estas credenciales.
+- El ESP32 debe configurar el host público del VPS, no `mosquitto`, porque
+  `mosquitto` solo resuelve dentro de la red Docker.
+- En local, configure `HARDWARE_DEVICE_IDS` en `.env` con los IDs reales;
+  en Dokploy, configure la misma variable en el entorno del proyecto.
+
+Los IDs impiden que el simulador publique telemetría falsa para dispositivos
+atendidos por hardware real:
+
+```bash
+HARDWARE_DEVICE_IDS=7,8
+docker compose up -d --wait
+```
+
+Abra el visor de demostración en `http://localhost:8090` (o mediante un dominio
+protegido en Dokploy) para observar registro, órdenes y telemetría.
+
+### Contrato MQTT
+
+| Tópico | Dirección | QoS / contenido |
+|---|---|---|
+| `registry/{deviceId}` | backend → broker | Registro retenido `{ "deviceId": <int>, "type": "<tipo>" }`; payload vacío elimina el dispositivo |
+| `commands/{deviceId}` | backend → ESP32 | Orden retenida con los atributos deseados completos |
+| `telemetry/{deviceId}` | ESP32 → backend | Lecturas JSON cada 5 segundos y después de ejecutar una orden |
+
+Ejemplo de orden:
+
+```json
+{"power":true,"mode":"cooling","targetTemperature":24}
+```
+
+Ejemplo de telemetría:
+
+```json
+{
+  "deviceId": 8,
+  "eventId": "esp32-8-1795286335-27",
+  "timestamp": "2026-11-21T18:38:55.079Z",
+  "status": "online",
+  "reported": {"power":true,"mode":"cooling","targetTemperature":24},
+  "energy_kwh": 0.0017,
+  "temperature_c": 25.0,
+  "voltage_v": 220,
+  "node": {
+    "relay": true,
+    "humidity": 55,
+    "presence": false,
+    "blind_deg": 180,
+    "alarm": false
+  }
+}
+```
+
+El ESP32 debe usar el ID registrado en IoBuild como último segmento del tópico
+y en `deviceId`. `eventId` debe ser único; `timestamp` debe ser ISO 8601;
+`reported` representa el estado confirmado que devuelve el nodo. Los campos
+opcionalmente admitidos dentro de `node` son `humidity`, `presence`,
+`blind_deg` y `alarm`. El backend persiste la telemetría principal en MySQL,
+escribe la telemetría adicional en InfluxDB cuando está disponible y conserva
+MySQL aunque InfluxDB quede fuera de servicio.
+
+Compruebe el flujo desde otra red con:
+
+```bash
+mosquitto_sub -h <IP-o-dominio-del-VPS> -p 1883 \
+  -u iobuild -P <MQTT_PASSWORD> -t 'telemetry/#' -v
+```
+
+Consulte [hardware/README.md](hardware/README.md)
+para el resumen interno y el
+[firmware externo](https://github.com/IoBuild-IoT/edge-node) para cableado,
+configuración Arduino y solución de problemas.
+
 ## Project Layout
 
 ```
