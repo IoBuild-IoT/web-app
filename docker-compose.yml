@@ -15,6 +15,11 @@ services:
       - ConnectionStrings__IoBuild=${ConnectionStrings__IoBuild:-Server=mysql-monolith;Port=3306;Database=iobuild;User=root;Password=${DB_PASSWORD:-iobuild}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - Migrations__ApplyOnStartup=true
+      - DemoSeed__Enabled=${DEMO_SEED_ENABLED:-false}
+      - DemoSeed__BuilderEmail=${DEMO_BUILDER_EMAIL:-builder.demo@iobuild.test}
+      - DemoSeed__BuilderPassword=${DEMO_BUILDER_PASSWORD:-}
+      - DemoSeed__OwnerEmail=${DEMO_OWNER_EMAIL:-owner.demo@iobuild.test}
+      - DemoSeed__OwnerPassword=${DEMO_OWNER_PASSWORD:-}
       - Mqtt__Enabled=true
       - Mqtt__Host=mosquitto
       - Mqtt__Port=1883
