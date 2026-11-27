@@ -298,6 +298,7 @@ if (builder.Configuration.GetValue<bool>("Migrations:ApplyOnStartup", true))
 
     var dbContext = scope.ServiceProvider.GetRequiredService<IoBuildDbContext>();
     await DataSeeder.SeedAsync(dbContext, app.Lifetime.ApplicationStopping);
+    await DemoSeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Lifetime.ApplicationStopping);
 }
 
 app.Use(async (context, next) =>
